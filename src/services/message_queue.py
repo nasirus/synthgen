@@ -70,8 +70,8 @@ class RabbitMQHandler:
                 # Don't declare the queue here, as it's already declared in connect()
         except (
             pika.exceptions.AMQPConnectionError,
-            pika.exceptions.AMQPChannelError,
-        ) as e:
+            pika.exceptions.AMQPChannelError
+        ):
             # If there's any connection issue, try to reconnect
             self.connect()
 
@@ -79,11 +79,12 @@ class RabbitMQHandler:
         self.ensure_connection()
         # Generate a unique message ID
         message_id = str(uuid.uuid4())
-        timestamp = datetime.now()
+        timestamp = datetime.now().isoformat()
 
         # Add metadata to the message
         message_with_metadata = {
             "message_id": message_id,
+            "timestamp": timestamp,
             "payload": message,
         }
 
@@ -96,7 +97,6 @@ class RabbitMQHandler:
                 properties=pika.BasicProperties(
                     delivery_mode=2,  # make message persistent
                     message_id=message_id,
-                    headers={"status": TaskStatus.PENDING.value},
                 ),
             )
         except (pika.exceptions.AMQPConnectionError, pika.exceptions.AMQPChannelError):

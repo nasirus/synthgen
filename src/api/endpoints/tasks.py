@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, File, UploadFile, Form
-from typing import Optional
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+from typing import List
 from services.message_queue import RabbitMQHandler
 from schemas.task import TaskResponse
 
@@ -7,36 +8,25 @@ router = APIRouter()
 USE_API_PREFIX = True  # This will add the API version prefix
 rabbitmq_handler = RabbitMQHandler()
 
+class Message(BaseModel):
+    role: str = Field(..., description="Role of the message sender (e.g., 'developer', 'user')")
+    content: str = Field(..., description="Content of the message")
+
+class TaskRequest(BaseModel):
+    model: str = Field(..., description="The model to be used (e.g., 'gpt-4')")
+    messages: List[Message] = Field(..., description="List of messages for the conversation")
+
 @router.post("/submit", response_model=TaskResponse)
-async def submit_task(
-    message: Optional[str] = Form(None),
-    file: Optional[UploadFile] = File(None)
-):
-    if not message and not file:
-        raise HTTPException(
-            status_code=400,
-            detail="Either message or file must be provided"
-        )
-    
+async def submit_task(request: TaskRequest):
     try:
         task_data = {
-            "task_type": "file_processing" if file else "message_processing",
-            "content": None
+            "model": request.model,
+            "messages": [msg.model_dump() for msg in request.messages]
         }
-        
-        if file:
-            content = await file.read()
-            task_data["content"] = content.decode()
-            task_data["filename"] = file.filename
-        else:
-            task_data["content"] = message
-            
-        message_id =rabbitmq_handler.publish_message(task_data)
+
+        message_id = rabbitmq_handler.publish_message(task_data)
         
         return TaskResponse(
-            status="success",
-            message="Task submitted successfully",
-            **task_data,
             message_id=message_id
         )
         

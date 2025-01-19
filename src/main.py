@@ -1,48 +1,21 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+from fastapi import FastAPI
+from core.config import settings
+from api import get_all_routers
+import uvicorn
 
 # Create FastAPI app
 app = FastAPI(
-    title="Synthetic Data Generator API",
+    title=settings.PROJECT_NAME,
     description="API for generating synthetic data using LLMs",
-    version="1.0.0"
+    version=settings.VERSION
 )
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./synthetic_data.db")
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# Dependency to get database session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+# Dynamically include all routers
+for router_type, router in get_all_routers():
+    if router_type == "api":
+        app.include_router(router, prefix=settings.API_V1_STR)
+    else:
+        app.include_router(router)
 
 # Root endpoint
 @app.get("/")
@@ -54,5 +27,4 @@ async def root():
     }
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

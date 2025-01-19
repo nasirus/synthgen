@@ -16,11 +16,11 @@ class Settings:
     RABBITMQ_HOST: str = os.getenv('RABBITMQ_HOST', 'localhost')
     RABBITMQ_PORT: int = int(os.getenv('RABBITMQ_PORT', 5672))
     
-    # Database Settings (for future use)
-    DATABASE_URL: str = os.getenv('DATABASE_URL', 'sqlite:///./sql_app.db')
-    
-    # LLM Settings (for future use)
-    LLM_API_KEY: str = os.getenv('LLM_API_KEY', '')
-    LLM_MODEL: str = os.getenv('LLM_MODEL', 'gpt-3.5-turbo')
+    # Postgres Database Settings
+    POSTGRES_USER: str = os.getenv('POSTGRES_USER', 'postgres')
+    POSTGRES_PASSWORD: str = os.getenv('POSTGRES_PASSWORD', 'postgres')
+    POSTGRES_HOST: str = os.getenv('POSTGRES_HOST', 'localhost')
+    POSTGRES_PORT: int = int(os.getenv('POSTGRES_PORT', 5432))
+    POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'synthetic_data_generator')
 
 settings = Settings() 

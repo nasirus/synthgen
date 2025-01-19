@@ -31,12 +31,13 @@ async def submit_task(
         else:
             task_data["content"] = message
             
-        rabbitmq_handler.publish_message(task_data)
+        message_id =rabbitmq_handler.publish_message(task_data)
         
         return TaskResponse(
             status="success",
             message="Task submitted successfully",
-            **task_data
+            **task_data,
+            message_id=message_id
         )
         
     except Exception as e:

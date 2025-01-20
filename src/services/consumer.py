@@ -14,7 +14,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import logging.handlers
 import concurrent.futures
-from sqlalchemy import text
 
 load_dotenv()
 
@@ -147,7 +146,7 @@ class MessageConsumer:
                 cached_result["usage"] = {
                     "prompt_tokens": 0,
                     "completion_tokens": 0,
-                    "total_tokens": 0
+                    "total_tokens": 0,
                 }
                 cached_result["cached"] = True
                 return cached_result

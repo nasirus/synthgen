@@ -75,7 +75,7 @@ class RabbitMQHandler:
             # If there's any connection issue, try to reconnect
             self.connect()
 
-    def publish_message(self, message) -> str:
+    def publish_message(self, message, batch_id: str = None) -> str:
         self.ensure_connection()
         # Generate a unique message ID
         message_id = str(uuid.uuid4())
@@ -86,6 +86,7 @@ class RabbitMQHandler:
             "message_id": message_id,
             "timestamp": timestamp,
             "payload": message,
+            "batch_id": batch_id,
         }
 
         # Publish message to RabbitMQ
@@ -118,6 +119,7 @@ class RabbitMQHandler:
         try:
             event = Event(
                 message_id=message_id,
+                batch_id=batch_id,
                 created_at=timestamp,
                 updated_at=timestamp,
                 status=TaskStatus.PENDING.value,

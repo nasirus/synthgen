@@ -10,6 +10,7 @@ import logging
 from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential
 from database.session import engine, SessionLocal
+import time
 
 load_dotenv()
 
@@ -18,7 +19,7 @@ class MessageConsumer:
     def __init__(self):
         self._setup_logging()
         self._initialize_db()
-        self._initialize_rabbitmq()
+        self._connect_to_rabbitmq()
 
     def _setup_logging(self):
         self.logger = logging.getLogger(__name__)
@@ -45,20 +46,46 @@ class MessageConsumer:
         self.SessionLocal = SessionLocal
         self.logger.info("Database connection initialized successfully")
 
-    def _initialize_rabbitmq(self):
+    def _connect_to_rabbitmq(self):
+        """Establish connection to RabbitMQ with retry mechanism"""
         self.logger.info("Initializing RabbitMQ connection")
-        credentials = pika.PlainCredentials(
-            username=settings.RABBITMQ_USER, password=settings.RABBITMQ_PASS
-        )
-        parameters = pika.ConnectionParameters(
-            host=settings.RABBITMQ_HOST,
-            port=settings.RABBITMQ_PORT,
-            credentials=credentials,
-        )
-        self.connection = pika.BlockingConnection(parameters)
-        self.channel = self.connection.channel()
-        self.channel.queue_declare(queue="data_generation_tasks", durable=True)
-        self.logger.info("RabbitMQ connection initialized successfully")
+        while True:
+            try:
+                credentials = pika.PlainCredentials(
+                    username=settings.RABBITMQ_USER, password=settings.RABBITMQ_PASS
+                )
+                parameters = pika.ConnectionParameters(
+                    host=settings.RABBITMQ_HOST,
+                    port=settings.RABBITMQ_PORT,
+                    credentials=credentials,
+                    heartbeat=600,  # 10 minutes heartbeat
+                    blocked_connection_timeout=300,  # 5 minutes timeout
+                    connection_attempts=3,
+                    retry_delay=5,
+                )
+                self.connection = pika.BlockingConnection(parameters)
+                self.channel = self.connection.channel()
+                self.channel.queue_declare(queue="data_generation_tasks", durable=True)
+                self.logger.info("RabbitMQ connection initialized successfully")
+                break
+            except Exception as e:
+                self.logger.error(f"Failed to connect to RabbitMQ: {str(e)}")
+                self.logger.info("Retrying in 5 seconds...")
+                time.sleep(5)
+
+    def _ensure_connection(self):
+        """Ensure the connection is active, reconnect if necessary"""
+        try:
+            if not self.connection or self.connection.is_closed:
+                self.logger.warning("RabbitMQ connection is closed. Reconnecting...")
+                self._connect_to_rabbitmq()
+            if not self.channel or self.channel.is_closed:
+                self.logger.warning("RabbitMQ channel is closed. Recreating channel...")
+                self.channel = self.connection.channel()
+                self.channel.queue_declare(queue="data_generation_tasks", durable=True)
+        except Exception as e:
+            self.logger.error(f"Error ensuring connection: {str(e)}")
+            self._connect_to_rabbitmq()
 
     def _update_event_status(
         self, message_id: str, status: TaskStatus, result: Dict[str, Any] = None
@@ -83,7 +110,7 @@ class MessageConsumer:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10),
-        reraise=True
+        reraise=True,
     )
     def _send_llm_request(self, payload):
         return completion(model=payload["model"], messages=payload["messages"])
@@ -125,15 +152,46 @@ class MessageConsumer:
             self.logger.debug(f"Acknowledged message {message_id}")
 
     def start_consuming(self):
-        self.logger.info("Starting consumer")
-        self.channel.basic_qos(prefetch_count=1)
-        self.channel.basic_consume(
-            queue="data_generation_tasks", on_message_callback=self.process_message
-        )
-        self.logger.info("Started consuming messages...")
-        self.channel.start_consuming()
+        """Start consuming messages with automatic recovery"""
+        while True:
+            try:
+                self.logger.info("Starting consumer")
+                self._ensure_connection()
+                self.channel.basic_qos(prefetch_count=1)
+                self.channel.basic_consume(
+                    queue="data_generation_tasks",
+                    on_message_callback=self.process_message,
+                )
+                self.logger.info("Started consuming messages...")
+                self.channel.start_consuming()
+            except pika.exceptions.ConnectionClosedByBroker:
+                self.logger.warning("Connection closed by broker, retrying...")
+                continue
+            except pika.exceptions.AMQPChannelError as e:
+                self.logger.error(f"Channel error: {str(e)}, retrying...")
+                continue
+            except pika.exceptions.AMQPConnectionError:
+                self.logger.error("Connection was closed, retrying...")
+                continue
+            except Exception as e:
+                self.logger.error(f"Unexpected error: {str(e)}")
+                self.logger.info("Retrying in 5 seconds...")
+                time.sleep(5)
+                continue
 
 
 if __name__ == "__main__":
-    consumer = MessageConsumer()
-    consumer.start_consuming()
+    import time
+
+    while True:
+        try:
+            consumer = MessageConsumer()
+            consumer.start_consuming()
+        except KeyboardInterrupt:
+            if consumer.connection and not consumer.connection.is_closed:
+                consumer.connection.close()
+            break
+        except Exception as e:
+            logging.error(f"Main loop error: {str(e)}")
+            logging.info("Restarting consumer in 5 seconds...")
+            time.sleep(5)

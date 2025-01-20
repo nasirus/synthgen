@@ -1,13 +1,15 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List
 from services.message_queue import RabbitMQHandler
-from schemas.task import TaskResponse
-from datetime import datetime
 
 router = APIRouter()
-USE_API_PREFIX = True  # This will add the API version prefix
 rabbitmq_handler = RabbitMQHandler()
+USE_API_PREFIX = True
+
+
+class TaskResponse(BaseModel):
+    message_id: str
 
 
 class Message(BaseModel):
@@ -22,14 +24,6 @@ class TaskRequest(BaseModel):
     messages: List[Message] = Field(
         ..., description="List of messages for the conversation"
     )
-
-
-class TaskStatusResponse(BaseModel):
-    message_id: str
-    status: str
-    result: Optional[dict] = None
-    created_at: datetime
-    updated_at: datetime
 
 
 @router.post("/submit", response_model=TaskResponse)

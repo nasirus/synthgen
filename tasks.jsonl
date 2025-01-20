@@ -1,0 +1,3 @@
+{"model":"together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free","messages":[{"role":"system","content":"You are a helpful assistant"},{"role":"user","content":"Write a haiku about recursion in programming"}]}
+{"model":"together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free","messages":[{"role":"system","content":"You are a helpful assistant"},{"role":"user","content":"Write a haiku about love"}]}
+{"model":"together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free","messages":[{"role":"system","content":"You are a helpful assistant"},{"role":"user","content":"Write a haiku about the future"}]}

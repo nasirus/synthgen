@@ -26,7 +26,7 @@ class TaskRequest(BaseModel):
     )
 
 
-@router.post("/submit", response_model=TaskResponse)
+@router.post("/tasks", response_model=TaskResponse)
 async def submit_task(request: TaskRequest):
     try:
         task_data = {

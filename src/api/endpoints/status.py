@@ -18,7 +18,7 @@ class TaskStatusResponse(BaseModel):
     updated_at: datetime
     duration: int
 
-@router.get("/status/{message_id}", response_model=TaskStatusResponse)
+@router.get("/tasks/{message_id}", response_model=TaskStatusResponse)
 async def get_task_status(message_id: str, db: Session = Depends(get_db)):
     try:
         event = db.query(Event).filter(Event.message_id == message_id).first()

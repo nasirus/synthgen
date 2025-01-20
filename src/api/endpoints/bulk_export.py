@@ -10,7 +10,7 @@ router = APIRouter()
 USE_API_PREFIX = True
 
 
-@router.get("/bulk-export/{batch_id}")
+@router.get("/batches/{batch_id}/export")
 async def export_batch_data(
     batch_id: str,
     format: str = Query("json", enum=["json", "jsonl", "csv"]),

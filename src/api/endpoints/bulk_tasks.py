@@ -15,7 +15,7 @@ class BulkTaskResponse(BaseModel):
     rows: int
 
 
-@router.post("/bulk-submit", response_model=BulkTaskResponse)
+@router.post("/batches", response_model=BulkTaskResponse)
 async def submit_bulk_tasks(file: UploadFile = File(...)):
     if not file.filename.endswith(".jsonl"):
         raise HTTPException(status_code=400, detail="Only JSONL files are supported")

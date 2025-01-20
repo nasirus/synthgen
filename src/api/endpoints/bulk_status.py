@@ -18,7 +18,7 @@ class BulkTaskStatusResponse(BaseModel):
     task_status: TaskStatus
 
 
-@router.get("/bulk-status/{batch_id}", response_model=BulkTaskStatusResponse)
+@router.get("/batches/{batch_id}", response_model=BulkTaskStatusResponse)
 async def get_bulk_task_status(batch_id: str, db: Session = Depends(get_db)):
     try:
         events = db.query(Event).filter(Event.batch_id == batch_id).all()

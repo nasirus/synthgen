@@ -24,6 +24,12 @@ class Settings:
     POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'synthetic_data_generator')
 
     # OpenAI API Settings
-    OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', 'sk-proj-0123456789012345678901234567890123456789012345678901234567890123')
+    OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
+
+    # Maximum number of parallel tasks
+    MAX_PARALLEL_TASKS: int = int(os.getenv('MAX_PARALLEL_TASKS', 10))
+    
+    # Maximum number of retries
+    MAX_RETRIES: int = int(os.getenv('MAX_RETRIES', 3))
 
 settings = Settings() 

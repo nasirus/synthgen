@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential
 from database.session import engine, SessionLocal
 import time
+from concurrent.futures import ThreadPoolExecutor
+import logging.handlers
+import concurrent.futures
 
 load_dotenv()
 
@@ -20,6 +23,7 @@ class MessageConsumer:
         self._setup_logging()
         self._initialize_db()
         self._connect_to_rabbitmq()
+        self.executor = ThreadPoolExecutor(max_workers=settings.MAX_PARALLEL_TASKS)
 
     def _setup_logging(self):
         self.logger = logging.getLogger(__name__)
@@ -27,7 +31,11 @@ class MessageConsumer:
 
         # Create handlers
         console_handler = logging.StreamHandler()
-        file_handler = logging.FileHandler("consumer.log")
+        file_handler = logging.handlers.RotatingFileHandler(
+            "consumer.log",
+            maxBytes=10485760,  # 10MB
+            backupCount=5
+        )
 
         # Create formatters and add it to handlers
         log_format = logging.Formatter(
@@ -108,20 +116,37 @@ class MessageConsumer:
             db_session.close()
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
+        stop=stop_after_attempt(settings.MAX_RETRIES),
+        wait=wait_exponential(multiplier=2, min=4, max=60),
         reraise=True,
+        before_sleep=lambda retry_state: logging.info(
+            f"Retrying LLM request attempt {retry_state.attempt_number}"
+        )
     )
     def _send_llm_request(self, payload):
         return completion(model=payload["model"], messages=payload["messages"])
 
     def process_message(self, ch, method, properties, body):
+        # Capture delivery tag and message data
+        delivery_tag = method.delivery_tag
         message_data = json.loads(body)
         message_id = message_data["message_id"]
         payload = message_data["payload"]
 
-        self.logger.info(f"Processing message {message_id}")
+        self.logger.info(f"Scheduling message {message_id} for processing")
 
+        # Submit to thread pool
+        self.executor.submit(
+            self.process_message_async,
+            ch,
+            method,
+            body,
+            message_id,
+            payload
+        )
+
+    def process_message_async(self, ch, method, body, message_id, payload):
+        start_time = time.time()
         try:
             self.logger.debug(f"Updating status to PROCESSING for message {message_id}")
             self._update_event_status(message_id, TaskStatus.PROCESSING)
@@ -142,14 +167,26 @@ class MessageConsumer:
             self._update_event_status(message_id, TaskStatus.COMPLETED, result)
             self.logger.info(f"Successfully processed message {message_id}")
 
+        except concurrent.futures.TimeoutError:
+            self.logger.error(f"Message {message_id} processing timed out")
+            self._update_event_status(message_id, TaskStatus.FAILED, {"error": "Processing timeout"})
         except Exception as e:
-            self.logger.error(
-                f"Error processing message {message_id}: {str(e)}", exc_info=True
-            )
+            self.logger.error(f"Error processing message {message_id}: {str(e)}", exc_info=True)
             self._update_event_status(message_id, TaskStatus.FAILED, {"error": str(e)})
         finally:
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-            self.logger.debug(f"Acknowledged message {message_id}")
+            processing_time = time.time() - start_time
+            self.logger.info(f"Message {message_id} processed in {processing_time:.2f} seconds")
+            # Use add_callback_threadsafe to ack in the main thread
+            self.connection.add_callback_threadsafe(
+                lambda: self.callback_ack(ch, method.delivery_tag)
+            )
+
+    def callback_ack(self, ch, delivery_tag):
+        """Acknowledge the message in the main thread"""
+        if ch.is_open:
+            ch.basic_ack(delivery_tag)
+        else:
+            self.logger.warning("Channel closed, message %s not acknowledged", delivery_tag)
 
     def start_consuming(self):
         """Start consuming messages with automatic recovery"""
@@ -157,7 +194,7 @@ class MessageConsumer:
             try:
                 self.logger.info("Starting consumer")
                 self._ensure_connection()
-                self.channel.basic_qos(prefetch_count=1)
+                self.channel.basic_qos(prefetch_count=settings.MAX_PARALLEL_TASKS)
                 self.channel.basic_consume(
                     queue="data_generation_tasks",
                     on_message_callback=self.process_message,

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import StreamingResponse
+import json
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import Optional
 from models.event import Event
 from database.session import get_db
 
@@ -11,46 +12,81 @@ USE_API_PREFIX = True
 
 @router.get("/bulk-export/{batch_id}")
 async def export_batch_data(
-    batch_id: str, db: Session = Depends(get_db)
-) -> JSONResponse:
+    batch_id: str,
+    format: str = Query("json", enum=["json", "jsonl", "csv"]),
+    chunk_size: Optional[int] = Query(1000, gt=0),
+    include_fields: Optional[str] = Query(
+        None, description="Comma-separated list of fields to include"
+    ),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
     """
     Export all data associated with a specific batch_id.
-    Returns a JSON file containing all events and their associated data.
+    Supports streaming response in different formats with field filtering.
+
+    Args:
+        batch_id: The batch ID to export
+        format: Output format (json, jsonl, or csv)
+        chunk_size: Number of records to process at once
+        include_fields: Optional comma-separated list of fields to include
     """
     try:
-        events = db.query(Event).filter(Event.batch_id == batch_id).all()
+        # Parse included fields if specified
+        fields = include_fields.split(",") if include_fields else None
 
-        if not events:
-            raise HTTPException(
-                status_code=404, detail=f"No tasks found for batch_id {batch_id}"
-            )
+        async def generate_data():
+            offset = 0
+            while True:
+                events = (
+                    db.query(Event)
+                    .filter(Event.batch_id == batch_id)
+                    .limit(chunk_size)
+                    .offset(offset)
+                    .all()
+                )
 
-        # Convert events to a list of dictionaries
-        export_data: List[Dict[Any, Any]] = []
-        for event in events:
-            event_data = {
-                "batch_id": event.batch_id,
-                "message_id": str(event.message_id),
-                "status": event.status,
-                "payload": event.payload,
-                "result": event.result,
-                "created_at": event.created_at.isoformat(),
-                "updated_at": event.updated_at.isoformat(),
-                "duration": event.duration,
-            }
-            export_data.append(event_data)
+                if not events:
+                    break
 
-        # Create response with appropriate headers for file download
-        return JSONResponse(
-            content=export_data,
-            headers={
-                "Content-Disposition": f"attachment; filename=batch_{batch_id}_export.json",
-                "Content-Type": "application/json",
-            },
+                for event in events:
+                    event_data = {
+                        "batch_id": event.batch_id,
+                        "message_id": str(event.message_id),
+                        "status": event.status,
+                        "payload": event.payload,
+                        "result": event.result,
+                        "created_at": event.created_at.isoformat(),
+                        "updated_at": event.updated_at.isoformat(),
+                        "duration": event.duration,
+                    }
+
+                    # Filter fields if specified
+                    if fields:
+                        event_data = {
+                            k: v for k, v in event_data.items() if k in fields
+                        }
+
+                    if format == "jsonl":
+                        yield json.dumps(event_data) + "\n"
+                    elif format == "json":
+                        yield json.dumps(event_data) + ","
+
+                offset += chunk_size
+
+        # Set appropriate content type and filename
+        content_type = "application/json" if format in ["json", "jsonl"] else "text/csv"
+        filename = f"batch_{batch_id}_export.{format}"
+
+        headers = {
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Type": content_type,
+        }
+
+        return StreamingResponse(
+            generate_data(),
+            headers=headers,
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to export batch data: {str(e)}"

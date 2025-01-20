@@ -75,17 +75,32 @@ class RabbitMQHandler:
             # If there's any connection issue, try to reconnect
             self.connect()
 
+    def normalize_payload(self, payload):
+        """Normalize the payload to ensure consistent field ordering"""
+        if isinstance(payload, dict):
+            # Sort keys and recursively normalize nested dictionaries
+            return {k: self.normalize_payload(v) for k, v in sorted(payload.items())}
+        elif isinstance(payload, list):
+            # Normalize each item in the list
+            return [self.normalize_payload(item) for item in payload]
+        else:
+            # Return the item as is if it's not a dict or list
+            return payload
+
     def publish_message(self, message, batch_id: str = None) -> str:
         self.ensure_connection()
         # Generate a unique message ID
         message_id = str(uuid.uuid4())
         timestamp = datetime.now().isoformat()
 
+        # Normalize the payload to ensure consistent field ordering
+        normalized_payload = self.normalize_payload(message)
+
         # Add metadata to the message
         message_with_metadata = {
             "message_id": message_id,
             "timestamp": timestamp,
-            "payload": message,
+            "payload": normalized_payload,
             "batch_id": batch_id,
         }
 
@@ -123,7 +138,7 @@ class RabbitMQHandler:
                 created_at=timestamp,
                 updated_at=timestamp,
                 status=TaskStatus.PENDING.value,
-                payload=json.dumps(message),
+                payload=json.dumps(normalized_payload),
             )
             db_session.add(event)
             db_session.commit()

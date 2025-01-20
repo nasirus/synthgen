@@ -14,6 +14,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import logging.handlers
 import concurrent.futures
+from sqlalchemy import text
 
 load_dotenv()
 
@@ -32,9 +33,7 @@ class MessageConsumer:
         # Create handlers
         console_handler = logging.StreamHandler()
         file_handler = logging.handlers.RotatingFileHandler(
-            "consumer.log",
-            maxBytes=10485760,  # 10MB
-            backupCount=5
+            "consumer.log", maxBytes=10485760, backupCount=5  # 10MB
         )
 
         # Create formatters and add it to handlers
@@ -121,14 +120,46 @@ class MessageConsumer:
         reraise=True,
         before_sleep=lambda retry_state: logging.info(
             f"Retrying LLM request attempt {retry_state.attempt_number}"
-        )
+        ),
     )
     def _send_llm_request(self, payload):
         return completion(model=payload["model"], messages=payload["messages"])
 
+    def _get_cached_completion(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Check if there's a cached completion for the given payload"""
+        db_session = self.SessionLocal()
+        try:
+            # Normalize the payload to match the database format
+            payload_json = json.dumps(payload, sort_keys=True)
+
+            # Use direct string comparison with escaped quotes
+            event = (
+                db_session.query(Event)
+                .filter(Event.status == TaskStatus.COMPLETED.value)
+                .filter(Event.payload == payload_json)
+                .first()
+            )
+
+            if event and event.result:
+                self.logger.info("Found cached completion for payload")
+                cached_result = json.loads(event.result)
+                # Reset usage data for cached results
+                cached_result["usage"] = {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0
+                }
+                cached_result["cached"] = True
+                return cached_result
+            return None
+        except Exception as e:
+            self.logger.error(f"Error checking cache: {str(e)}")
+            return None
+        finally:
+            db_session.close()
+
     def process_message(self, ch, method, properties, body):
-        # Capture delivery tag and message data
-        delivery_tag = method.delivery_tag
+        # Capture message data
         message_data = json.loads(body)
         message_id = message_data["message_id"]
         payload = message_data["payload"]
@@ -137,19 +168,27 @@ class MessageConsumer:
 
         # Submit to thread pool
         self.executor.submit(
-            self.process_message_async,
-            ch,
-            method,
-            body,
-            message_id,
-            payload
+            self.process_message_async, ch, method, body, message_id, payload
         )
 
     def process_message_async(self, ch, method, body, message_id, payload):
         start_time = time.time()
         try:
-            self.logger.debug(f"Updating status to PROCESSING for message {message_id}")
+            self.logger.debug(
+                f"No cache found. Updating status to PROCESSING for message {message_id}"
+            )
             self._update_event_status(message_id, TaskStatus.PROCESSING)
+
+            self.logger.debug(f"Checking cache for message {message_id}")
+
+            # Check for cached completion based on payload
+            cached_result = self._get_cached_completion(payload)
+            if cached_result:
+                self.logger.info(f"Using cached completion for message {message_id}")
+                self._update_event_status(
+                    message_id, TaskStatus.COMPLETED, cached_result
+                )
+                return
 
             self.logger.debug(f"Sending request to LLM for message {message_id}")
             response = self._send_llm_request(payload)
@@ -161,6 +200,7 @@ class MessageConsumer:
                     "completion_tokens": response.usage.completion_tokens,
                     "total_tokens": response.usage.total_tokens,
                 },
+                "cached": False,
             }
 
             self.logger.debug(f"Updating status to COMPLETED for message {message_id}")
@@ -169,13 +209,19 @@ class MessageConsumer:
 
         except concurrent.futures.TimeoutError:
             self.logger.error(f"Message {message_id} processing timed out")
-            self._update_event_status(message_id, TaskStatus.FAILED, {"error": "Processing timeout"})
+            self._update_event_status(
+                message_id, TaskStatus.FAILED, {"error": "Processing timeout"}
+            )
         except Exception as e:
-            self.logger.error(f"Error processing message {message_id}: {str(e)}", exc_info=True)
+            self.logger.error(
+                f"Error processing message {message_id}: {str(e)}", exc_info=True
+            )
             self._update_event_status(message_id, TaskStatus.FAILED, {"error": str(e)})
         finally:
             processing_time = time.time() - start_time
-            self.logger.info(f"Message {message_id} processed in {processing_time:.2f} seconds")
+            self.logger.info(
+                f"Message {message_id} processed in {processing_time:.2f} seconds"
+            )
             # Use add_callback_threadsafe to ack in the main thread
             self.connection.add_callback_threadsafe(
                 lambda: self.callback_ack(ch, method.delivery_tag)
@@ -186,7 +232,9 @@ class MessageConsumer:
         if ch.is_open:
             ch.basic_ack(delivery_tag)
         else:
-            self.logger.warning("Channel closed, message %s not acknowledged", delivery_tag)
+            self.logger.warning(
+                "Channel closed, message %s not acknowledged", delivery_tag
+            )
 
     def start_consuming(self):
         """Start consuming messages with automatic recovery"""

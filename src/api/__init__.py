@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 from importlib import import_module
 from pathlib import Path
+from api.endpoints import tasks, status
     
 def get_all_routers() -> list[APIRouter]:
     """Automatically discover and return all routers in the endpoints directory."""

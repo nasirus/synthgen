@@ -23,4 +23,7 @@ class Settings:
     POSTGRES_PORT: int = int(os.getenv('POSTGRES_PORT', 5432))
     POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'synthetic_data_generator')
 
+    # OpenAI API Settings
+    OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', 'sk-proj-0123456789012345678901234567890123456789012345678901234567890123')
+
 settings = Settings() 

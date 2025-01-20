@@ -118,7 +118,8 @@ class RabbitMQHandler:
         try:
             event = Event(
                 message_id=message_id,
-                timestamp=timestamp,
+                created_at=timestamp,
+                updated_at=timestamp,
                 status=TaskStatus.PENDING.value,
                 payload=json.dumps(message),
             )

@@ -40,7 +40,15 @@ async def get_bulk_task_status(batch_id: str, db: Session = Depends(get_db)):
             else:
                 pending_count += 1
 
-        task_status = TaskStatus.PENDING if pending_count > 0 else TaskStatus.COMPLETED
+        # If there are pending tasks, the batch is pending
+        # If there are failed tasks, the batch is failed
+        # If there are completed tasks, the batch is completed
+        if pending_count > 0:
+            task_status = TaskStatus.PENDING
+        elif failed_count > 0:
+            task_status = TaskStatus.FAILED
+        else:
+            task_status = TaskStatus.COMPLETED
 
         return BulkTaskStatusResponse(
             batch_id=batch_id,

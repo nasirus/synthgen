@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -139,33 +139,38 @@ async def get_bulk_task_status(batch_id: str, db: Session = Depends(get_db)):
         )
 
 
-@router.post("/batches", response_model=BulkTaskResponse)
-async def submit_bulk_tasks(file: UploadFile = File(...)):
-    if not file.filename.endswith(".jsonl"):
-        raise HTTPException(status_code=400, detail="Only JSONL files are supported")
-
-    batch_id = str(uuid.uuid4())
-
+async def process_bulk_tasks(content: bytes, batch_id: str):
     try:
-        content = await file.read()
         lines = content.decode("utf-8").strip().split("\n")
-        rows = len(lines)
-
         for line in lines:
             try:
                 task_data = json.loads(line)
                 task_request = TaskRequest(**task_data)
-
-                # Prepare task data for queue
                 queue_data = task_request.model_dump()
-
-                # Publish to queue using the async method
                 await rabbitmq_handler.publish_message(queue_data, batch_id)
-
             except Exception as e:
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to process bulk request: {str(e)}"
-                )
+                # Log the error but continue processing other tasks
+                print(f"Error processing task in batch {batch_id}: {str(e)}")
+    except Exception as e:
+        print(f"Error processing batch {batch_id}: {str(e)}")
+
+
+@router.post("/batches", response_model=BulkTaskResponse)
+async def submit_bulk_tasks(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...)
+):
+    if not file.filename.endswith(".jsonl"):
+        raise HTTPException(status_code=400, detail="Only JSONL files are supported")
+
+    try:
+        batch_id = str(uuid.uuid4())
+        content = await file.read()
+        lines = content.decode("utf-8").strip().split("\n")
+        rows = len(lines)
+
+        # Schedule the message processing in the background
+        background_tasks.add_task(process_bulk_tasks, content, batch_id)
 
         return BulkTaskResponse(batch_id=batch_id, rows=rows)
 

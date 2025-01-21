@@ -27,10 +27,11 @@ class MessageConsumer:
         # Remove any logging setup from __init__
         self.connection = None
         self.channel = None
-        self.db = None
         self._initialize_db()
         self._connect_to_rabbitmq()
         self.executor = ThreadPoolExecutor(max_workers=settings.MAX_PARALLEL_TASKS)
+        # Add session maker
+        self.Session = SessionLocal
 
     @classmethod
     def setup_logging(cls):
@@ -49,7 +50,7 @@ class MessageConsumer:
     def _initialize_db(self):
         logger.info("Initializing database connection")
         Base.metadata.create_all(bind=engine)
-        self.SessionLocal = SessionLocal
+        # Remove self.SessionLocal assignment as we'll use self.Session
         logger.info("Database connection initialized successfully")
 
     def _connect_to_rabbitmq(self):
@@ -93,11 +94,16 @@ class MessageConsumer:
             logger.error(f"Error ensuring connection: {str(e)}")
             self._connect_to_rabbitmq()
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        reraise=True
+    )
     def _update_event_status(
         self, message_id: str, status: TaskStatus, result: Dict[str, Any] = None, metadata: Dict[str, Any] = None
     ):
         logger.debug(f"Updating event status for message {message_id} to {status}")
-        db_session = self.SessionLocal()
+        db_session = self.Session()
         try:
             event: Optional[Event] = (
                 db_session.query(Event).filter(Event.message_id == message_id).first()
@@ -134,12 +140,21 @@ class MessageConsumer:
                     event.cached = metadata.get('cached', False)
 
                 db_session.commit()
+        except Exception as e:
+            logger.error(f"Database error in update_event_status: {str(e)}")
+            db_session.rollback()
+            raise
         finally:
             db_session.close()
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        reraise=True
+    )
     def _get_cached_completion(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Check if there's a cached completion for the given payload"""
-        db_session = self.SessionLocal()
+        db_session = self.Session()
         try:
             # Normalize the payload to match the database format
             payload_json = json.dumps(payload, sort_keys=True)
@@ -167,7 +182,8 @@ class MessageConsumer:
             return None
         except Exception as e:
             logger.error(f"Error checking cache: {str(e)}")
-            return None
+            db_session.rollback()
+            raise
         finally:
             db_session.close()
 

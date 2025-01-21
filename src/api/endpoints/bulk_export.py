@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 import json
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 from models.event import Event
 from database.session import get_db
 
@@ -37,7 +37,7 @@ async def export_batch_data(
         async def generate_data():
             offset = 0
             while True:
-                events = (
+                events: List[Event] = (
                     db.query(Event)
                     .filter(Event.batch_id == batch_id)
                     .limit(chunk_size)
@@ -56,7 +56,6 @@ async def export_batch_data(
                         "payload": event.payload,
                         "result": event.result,
                         "created_at": event.created_at.isoformat(),
-                        "updated_at": event.updated_at.isoformat(),
                         "duration": event.duration,
                     }
 

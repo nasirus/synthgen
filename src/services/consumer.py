@@ -2,7 +2,7 @@ import json
 import pika
 from litellm import completion
 from typing import Dict, Any, Optional
-from datetime import datetime
+import datetime
 from models.event import Base, Event
 from schemas.status import TaskStatus
 from core.config import settings
@@ -93,7 +93,7 @@ class MessageConsumer:
             self._connect_to_rabbitmq()
 
     def _update_event_status(
-        self, message_id: str, status: TaskStatus, result: Dict[str, Any] = None
+        self, message_id: str, status: TaskStatus, result: Dict[str, Any] = None, metadata: Dict[str, Any] = None
     ):
         logger.debug(f"Updating event status for message {message_id} to {status}")
         db_session = self.SessionLocal()
@@ -103,19 +103,34 @@ class MessageConsumer:
             )
             if event:
                 event.status = status.value
+                current_time = datetime.datetime.now(datetime.UTC)
 
-                # Handle timestamps based on status
-                if status == TaskStatus.PROCESSING:
-                    event.started_at = datetime.today()
-                elif status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
-                    event.completed_at = datetime.today()
+                # Always ensure started_at is set when transitioning to or already in PROCESSING
+                if status == TaskStatus.PROCESSING or (
+                    status in [TaskStatus.COMPLETED, TaskStatus.FAILED] and not event.started_at
+                ):
+                    event.started_at = current_time
+
+                # Handle completion timestamp
+                if status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
+                    event.completed_at = current_time
                     if event.started_at:
+                        # Ensure both timestamps are timezone-aware before subtraction
+                        if event.started_at.tzinfo is None:
+                            event.started_at = event.started_at.replace(tzinfo=datetime.UTC)
                         event.duration = int(
                             (event.completed_at - event.started_at).total_seconds()
                         )
 
                 if result:
                     event.result = json.dumps(result)
+                    
+                if metadata:
+                    if 'usage' in metadata:
+                        event.prompt_tokens = metadata['usage'].get('prompt_tokens', 0)
+                        event.completion_tokens = metadata['usage'].get('completion_tokens', 0)
+                        event.total_tokens = metadata['usage'].get('total_tokens', 0)
+                    event.cached = metadata.get('cached', False)
 
                 db_session.commit()
         finally:
@@ -191,26 +206,42 @@ class MessageConsumer:
             cached_result = self._get_cached_completion(payload)
             if cached_result:
                 logger.info(f"Using cached completion for message {message_id}")
+                # Store only the completion in result
+                result = {"completion": cached_result["completion"]}
+                # Pass usage and cached status separately to update_event_status
+                metadata = {
+                    "usage": {
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "total_tokens": 0,
+                    },
+                    "cached": True
+                }
                 self._update_event_status(
-                    message_id, TaskStatus.COMPLETED, cached_result
+                    message_id, TaskStatus.COMPLETED, result, metadata
                 )
                 return
 
             logger.debug(f"Sending request to LLM for message {message_id}")
             response = self._send_llm_request(payload)
 
+            # Store only the completion in result
             result = {
-                "completion": response.choices[0].message.content,
+                "completion": response.choices[0].message.content
+            }
+            
+            # Pass usage and cached status separately
+            metadata = {
                 "usage": {
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
                     "total_tokens": response.usage.total_tokens,
                 },
-                "cached": False,
+                "cached": False
             }
 
             logger.debug(f"Updating status to COMPLETED for message {message_id}")
-            self._update_event_status(message_id, TaskStatus.COMPLETED, result)
+            self._update_event_status(message_id, TaskStatus.COMPLETED, result, metadata)
             logger.info(f"Successfully processed message {message_id}")
 
         except concurrent.futures.TimeoutError:

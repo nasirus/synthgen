@@ -8,3 +8,4 @@ python-multipart==0.0.20
 psycopg2-binary==2.9.10
 litellm==1.59.0
 tenacity==9.0.0
+pytz==2024.2

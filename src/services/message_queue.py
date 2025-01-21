@@ -1,7 +1,7 @@
 import json
 import pika
 import uuid
-from datetime import datetime
+import datetime
 from dotenv import load_dotenv
 from schemas.status import TaskStatus
 from sqlalchemy import create_engine
@@ -91,7 +91,7 @@ class RabbitMQHandler:
         self.ensure_connection()
         # Generate a unique message ID
         message_id = str(uuid.uuid4())
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
 
         # Normalize the payload to ensure consistent field ordering
         normalized_payload = self.normalize_payload(message)
@@ -136,7 +136,6 @@ class RabbitMQHandler:
                 message_id=message_id,
                 batch_id=batch_id,
                 created_at=timestamp,
-                updated_at=timestamp,
                 status=TaskStatus.PENDING.value,
                 payload=json.dumps(normalized_payload),
             )

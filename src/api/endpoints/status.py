@@ -15,7 +15,6 @@ class TaskStatusResponse(BaseModel):
     status: str
     result: Optional[dict] = None
     created_at: datetime
-    updated_at: datetime
     duration: int
 
 @router.get("/tasks/{message_id}", response_model=TaskStatusResponse)
@@ -38,7 +37,6 @@ async def get_task_status(message_id: str, db: Session = Depends(get_db)):
             status=event.status,
             result=result,
             created_at=event.created_at,
-            updated_at=event.updated_at,
             duration=event.duration
         )
         

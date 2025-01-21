@@ -478,3 +478,46 @@ async def get_batch_tasks(
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch batch tasks: {str(e)}"
         )
+
+
+@retry(
+    stop=stop_after_attempt(settings.MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True,
+)
+@router.delete("/batches/{batch_id}", status_code=204)
+async def delete_batch(batch_id: str, db: Connection = Depends(get_db)):
+    logger.info(f"Deleting batch {batch_id}")
+    try:
+        with db.cursor(row_factory=dict_row) as cur:
+            # First check if the batch exists
+            cur.execute(
+                "SELECT COUNT(*) FROM events WHERE batch_id = %s",
+                (batch_id,)
+            )
+            count = cur.fetchone()["count"]
+            
+            if count == 0:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Batch {batch_id} not found"
+                )
+            
+            # Delete all events associated with the batch
+            cur.execute(
+                "DELETE FROM events WHERE batch_id = %s",
+                (batch_id,)
+            )
+            db.commit()
+            
+            logger.info(f"Successfully deleted batch {batch_id}")
+            return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete batch {batch_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete batch: {str(e)}"
+        )

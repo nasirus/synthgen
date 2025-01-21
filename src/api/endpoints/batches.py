@@ -51,16 +51,24 @@ setup_logging()
 
 
 class BulkTaskStatusResponse(BaseModel):
+    # Identifiers
     batch_id: str
+
+    # Status Overview
     batch_status: TaskStatus
-    created_at: datetime
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    duration: Optional[int]
     total_tasks: int
     completed_tasks: int
     failed_tasks: int
     pending_tasks: int
+    cached_tasks: int
+
+    # Timing Information
+    created_at: datetime
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    duration: Optional[int]
+
+    # Token Usage
     total_tokens: int
     prompt_tokens: int
     completion_tokens: int
@@ -79,14 +87,24 @@ class BatchListResponse(BaseModel):
 
 
 class TaskDetail(BaseModel):
+    # Identifiers
     message_id: str
+
+    # Status and Result
     status: TaskStatus
+    cached: Optional[bool]
+
+    # Input/Output
     payload: dict
     result: Optional[dict]
+
+    # Timing Information
     created_at: datetime
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     duration: Optional[int]
+
+    # Token Usage
     total_tokens: Optional[int]
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
@@ -122,7 +140,8 @@ async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
                     SUM(completion_tokens) as completion_tokens,
                     SUM(CASE WHEN status = %s THEN 1 ELSE 0 END) as completed_count,
                     SUM(CASE WHEN status = %s THEN 1 ELSE 0 END) as failed_count,
-                    COUNT(message_id) as total_count
+                    COUNT(message_id) as total_count,
+                    SUM(CASE WHEN cached = TRUE THEN 1 ELSE 0 END) as cached_count
                 FROM events
                 WHERE batch_id = %s
                 GROUP BY batch_id
@@ -159,6 +178,7 @@ async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
             "completed_tasks": completed_count,
             "failed_tasks": failed_count,
             "pending_tasks": pending_count,
+            "cached_tasks": batch_stats["cached_count"],
             "total_tokens": batch_stats["total_tokens"] or 0,
             "prompt_tokens": batch_stats["prompt_tokens"] or 0,
             "completion_tokens": batch_stats["completion_tokens"] or 0,
@@ -274,13 +294,32 @@ async def export_batch_data(
 
                     for event in events:
                         event_data = {
+                            # Identifiers
                             "batch_id": event["batch_id"],
                             "message_id": str(event["message_id"]),
+                            # Status and Result
                             "status": event["status"],
+                            "cached": event["cached"] or False,
+                            # Input/Output
                             "payload": event["payload"],
                             "result": event["result"],
+                            # Timing Information
                             "created_at": event["created_at"].isoformat(),
+                            "started_at": (
+                                event["started_at"].isoformat()
+                                if event["started_at"]
+                                else None
+                            ),
+                            "completed_at": (
+                                event["completed_at"].isoformat()
+                                if event["completed_at"]
+                                else None
+                            ),
                             "duration": event["duration"],
+                            # Token Usage
+                            "prompt_tokens": event["prompt_tokens"],
+                            "completion_tokens": event["completion_tokens"],
+                            "total_tokens": event["total_tokens"],
                         }
 
                         if fields:
@@ -415,6 +454,7 @@ async def get_batch_tasks(
             TaskDetail(
                 message_id=str(task["message_id"]),
                 status=TaskStatus(task["status"]),
+                cached=task["cached"] or False,
                 payload=task["payload"],
                 result=task["result"],
                 created_at=task["created_at"],

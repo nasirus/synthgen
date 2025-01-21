@@ -7,7 +7,8 @@ from psycopg import Connection
 from psycopg.rows import dict_row
 from database.session import get_db
 from schemas.status import TaskStatus
-
+from tenacity import retry, stop_after_attempt, wait_exponential
+from core.config import settings
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
 USE_API_PREFIX = True
@@ -69,7 +70,11 @@ async def submit_task(request: TaskRequest):
             status_code=500, detail=f"Failed to process request: {str(e)}"
         )
 
-
+@retry(
+    stop=stop_after_attempt(settings.MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True,
+)
 @router.get("/tasks/{message_id}", response_model=EventResponse)
 async def get_task_status(message_id: str, db: Connection = Depends(get_db)):
     try:
@@ -127,4 +132,43 @@ async def get_task_status(message_id: str, db: Connection = Depends(get_db)):
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to fetch task status: {str(e)}"
+        )
+
+@retry(
+    stop=stop_after_attempt(settings.MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True,
+)
+@router.delete("/tasks/{message_id}", status_code=204)
+async def delete_task(message_id: str, db: Connection = Depends(get_db)):
+    try:
+        with db.cursor(row_factory=dict_row) as cur:
+            # First check if the task exists
+            cur.execute(
+                "SELECT COUNT(*) FROM events WHERE message_id = %s",
+                (message_id,)
+            )
+            count = cur.fetchone()["count"]
+            
+            if count == 0:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Task with message_id {message_id} not found"
+                )
+            
+            # Delete the event
+            cur.execute(
+                "DELETE FROM events WHERE message_id = %s",
+                (message_id,)
+            )
+            db.commit()
+            
+            return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete task: {str(e)}"
         )

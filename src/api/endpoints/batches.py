@@ -192,7 +192,7 @@ async def submit_bulk_tasks(file: UploadFile = File(...)):
 @router.get("/batches/{batch_id}/export")
 async def export_batch_data(
     batch_id: str,
-    format: str = Query("json", enum=["json", "jsonl", "csv"]),
+    format: str = Query("json", enum=["json", "jsonl"]),
     chunk_size: Optional[int] = Query(1000, gt=0, le=10000),
     include_fields: Optional[str] = Query(
         None, description="Comma-separated list of fields to include"

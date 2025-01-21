@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from models.event import Event
 from schemas.status import TaskStatus
 from database.session import get_db
@@ -21,28 +22,39 @@ class BulkTaskStatusResponse(BaseModel):
 @router.get("/batches/{batch_id}", response_model=BulkTaskStatusResponse)
 async def get_bulk_task_status(batch_id: str, db: Session = Depends(get_db)):
     try:
-        events = db.query(Event).filter(Event.batch_id == batch_id).all()
+        # Query to get counts of tasks in different states
+        task_counts = (
+            db.query(
+                Event.status,
+                func.count(Event.message_id).label('count')
+            )
+            .filter(Event.batch_id == batch_id)
+            .group_by(Event.status)
+            .all()
+        )
 
-        if not events:
+        if not task_counts:
             raise HTTPException(
                 status_code=404, detail=f"No tasks found for batch_id {batch_id}"
             )
 
+        # Initialize counters
         completed_count = 0
         failed_count = 0
         pending_count = 0
 
-        for event in events:
-            if event.status == TaskStatus.COMPLETED.value:
-                completed_count += 1
-            elif event.status == TaskStatus.FAILED.value:
-                failed_count += 1
+        # Process the counts
+        for status, count in task_counts:
+            if status == TaskStatus.COMPLETED.value:
+                completed_count = count
+            elif status == TaskStatus.FAILED.value:
+                failed_count = count
             else:
-                pending_count += 1
+                pending_count = count
 
-        # If there are pending tasks, the batch is pending
-        # If there are failed tasks, the batch is failed
-        # If there are completed tasks, the batch is completed
+        total_tasks = completed_count + failed_count + pending_count
+
+        # Determine overall task status
         if pending_count > 0:
             task_status = TaskStatus.PENDING
         elif failed_count > 0:
@@ -52,7 +64,7 @@ async def get_bulk_task_status(batch_id: str, db: Session = Depends(get_db)):
 
         return BulkTaskStatusResponse(
             batch_id=batch_id,
-            total_tasks=len(events),
+            total_tasks=total_tasks,
             completed_tasks=completed_count,
             failed_tasks=failed_count,
             pending_tasks=pending_count,

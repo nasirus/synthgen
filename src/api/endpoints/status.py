@@ -1,49 +1,49 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.orm import Session
 from models.event import Event
 from database.session import get_db
+from pydantic import BaseModel
 from datetime import datetime
-import json
+from typing import Optional
+
+# Create Pydantic model for response
+class EventResponse(BaseModel):
+    message_id: str
+    batch_id: Optional[str]
+    status: str
+    payload: str
+    result: Optional[str]
+    prompt_tokens: Optional[int]
+    completion_tokens: Optional[int]
+    total_tokens: Optional[int]
+    cached: bool
+    created_at: datetime
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    duration: Optional[int]
+
+    class Config:
+        from_attributes = True  # Allows Pydantic to read data from SQLAlchemy models
 
 router = APIRouter()
 USE_API_PREFIX = True
 
-class TaskStatusResponse(BaseModel):
-    message_id: str
-    status: str
-    result: Optional[dict] = None
-    created_at: datetime
-    duration: int
 
-@router.get("/tasks/{message_id}", response_model=TaskStatusResponse)
+@router.get("/tasks/{message_id}", response_model=EventResponse)
 async def get_task_status(message_id: str, db: Session = Depends(get_db)):
     try:
-        event = db.query(Event).filter(Event.message_id == message_id).first()
-        
+        event: Event = db.query(Event).filter(Event.message_id == message_id).first()
+
         if not event:
             raise HTTPException(
-                status_code=404,
-                detail=f"Task with message_id {message_id} not found"
+                status_code=404, detail=f"Task with message_id {message_id} not found"
             )
-        
-        result = None
-        if event.result:
-            result = json.loads(event.result)
-            
-        return TaskStatusResponse(
-            message_id=event.message_id,
-            status=event.status,
-            result=result,
-            created_at=event.created_at,
-            duration=event.duration
-        )
-        
+
+        return event
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch task status: {str(e)}"
-        ) 
+            status_code=500, detail=f"Failed to fetch task status: {str(e)}"
+        )

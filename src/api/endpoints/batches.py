@@ -39,6 +39,13 @@ class BulkTaskResponse(BaseModel):
     rows: int
 
 
+class BatchListResponse(BaseModel):
+    batches: List[BulkTaskStatusResponse]
+    total: int
+    page: int
+    page_size: int
+
+
 @router.get("/batches/{batch_id}", response_model=BulkTaskStatusResponse)
 async def get_bulk_task_status(batch_id: str, db: Session = Depends(get_db)):
     try:
@@ -165,7 +172,7 @@ async def submit_bulk_tasks(file: UploadFile = File(...)):
 async def export_batch_data(
     batch_id: str,
     format: str = Query("json", enum=["json", "jsonl", "csv"]),
-    chunk_size: Optional[int] = Query(1000, gt=0),
+    chunk_size: Optional[int] = Query(1000, gt=0, le=10000),
     include_fields: Optional[str] = Query(
         None, description="Comma-separated list of fields to include"
     ),
@@ -224,12 +231,11 @@ async def export_batch_data(
                 offset += chunk_size
 
         # Set appropriate content type and filename
-        content_type = "application/json" if format in ["json", "jsonl"] else "text/csv"
         filename = f"batch_{batch_id}_export.{format}"
 
         headers = {
             "Content-Disposition": f"attachment; filename={filename}",
-            "Content-Type": content_type,
+            "Content-Type": "application/json",
         }
 
         return StreamingResponse(
@@ -240,4 +246,47 @@ async def export_batch_data(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to export batch data: {str(e)}"
+        )
+
+
+@router.get("/batches", response_model=BatchListResponse)
+async def list_batches(
+    page: int = Query(1, gt=0),
+    page_size: int = Query(50, gt=0, le=100),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Calculate offset
+        offset = (page - 1) * page_size
+
+        # Get unique batch IDs with pagination
+        batch_ids = (
+            db.query(Event.batch_id)
+            .distinct()
+            .order_by(Event.batch_id.desc())
+            .offset(offset)
+            .limit(page_size)
+            .all()
+        )
+
+        # Get total number of unique batches
+        total_batches = db.query(Event.batch_id).distinct().count()
+
+        # Get status for each batch
+        batches = []
+        for (batch_id,) in batch_ids:
+            batch_status = await get_bulk_task_status(batch_id, db)
+            batches.append(batch_status)
+
+        return BatchListResponse(
+            batches=batches,
+            total=total_batches,
+            page=page,
+            page_size=page_size
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch batch list: {str(e)}"
         )

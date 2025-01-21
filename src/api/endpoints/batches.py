@@ -46,6 +46,27 @@ class BatchListResponse(BaseModel):
     page_size: int
 
 
+class TaskDetail(BaseModel):
+    message_id: str
+    status: TaskStatus
+    payload: dict
+    result: Optional[dict]
+    created_at: datetime
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    duration: Optional[int]
+    total_tokens: Optional[int]
+    prompt_tokens: Optional[int]
+    completion_tokens: Optional[int]
+
+
+class BatchTasksResponse(BaseModel):
+    tasks: List[TaskDetail]
+    total: int
+    page: int
+    page_size: int
+
+
 @router.get("/batches/{batch_id}", response_model=BulkTaskStatusResponse)
 async def get_bulk_task_status(batch_id: str, db: Session = Depends(get_db)):
     try:
@@ -289,4 +310,72 @@ async def list_batches(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch batch list: {str(e)}"
+        )
+
+
+@router.get("/batches/{batch_id}/tasks", response_model=BatchTasksResponse)
+async def get_batch_tasks(
+    batch_id: str,
+    page: int = Query(1, gt=0),
+    page_size: int = Query(50, gt=0, le=100),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Calculate offset
+        offset = (page - 1) * page_size
+
+        # Get total count of tasks in batch
+        total_tasks = db.query(Event).filter(Event.batch_id == batch_id).count()
+
+        # Get paginated tasks
+        tasks = (
+            db.query(Event)
+            .filter(Event.batch_id == batch_id)
+            .order_by(Event.created_at.desc())
+            .offset(offset)
+            .limit(page_size)
+            .all()
+        )
+
+        if not tasks and page == 1:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No tasks found for batch_id {batch_id}"
+            )
+
+        task_details = [
+            TaskDetail(
+                message_id=str(task.message_id),
+                status=TaskStatus(task.status),
+                payload=json.loads(task.payload) if task.payload else None,
+                result=json.loads(task.result) if task.result else None,
+                created_at=task.created_at,
+                started_at=task.started_at,
+                completed_at=task.completed_at,
+                duration=task.duration,
+                total_tokens=task.total_tokens,
+                prompt_tokens=task.prompt_tokens,
+                completion_tokens=task.completion_tokens
+            )
+            for task in tasks
+        ]
+
+        return BatchTasksResponse(
+            tasks=task_details,
+            total=total_tasks,
+            page=page,
+            page_size=page_size
+        )
+
+    except HTTPException:
+        raise
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to parse JSON data: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch batch tasks: {str(e)}"
         )

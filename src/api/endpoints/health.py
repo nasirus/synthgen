@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import pika
-from sqlalchemy import create_engine, text
+from database.session import pool
 from core.config import settings
 from pydantic import BaseModel
 from typing import Literal
@@ -54,19 +54,17 @@ async def health_check():
 
     # Check PostgreSQL
     try:
-        db_url = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
-        engine = create_engine(db_url)
-
         @retry(
             stop=stop_after_attempt(settings.MAX_RETRIES),
             wait=wait_exponential(multiplier=1, min=4, max=10),
             reraise=True
         )
-        def check_db_connection(engine):
-            with engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
+        def check_db_connection():
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
 
-        check_db_connection(engine)
+        check_db_connection()
         services.postgres = "healthy"
     except Exception as e:
         errors.append(f"PostgreSQL: {str(e)}")

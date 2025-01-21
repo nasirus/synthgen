@@ -1,22 +1,22 @@
 import json
 import pika
-from litellm import completion
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import datetime
-from models.event import Base, Event
 from schemas.status import TaskStatus
 from core.config import settings
 import logging
 from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential
-from database.session import engine, SessionLocal
+from database.session import pool
 import time
 from concurrent.futures import ThreadPoolExecutor
 import logging.handlers
 import concurrent.futures
 from utils.llm_utils import send_llm_request
+import psycopg
+from psycopg.rows import dict_row
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Create a single logger instance at module level
 logger = logging.getLogger(__name__)
@@ -24,14 +24,10 @@ logger = logging.getLogger(__name__)
 
 class MessageConsumer:
     def __init__(self):
-        # Remove any logging setup from __init__
         self.connection = None
         self.channel = None
-        self._initialize_db()
         self._connect_to_rabbitmq()
         self.executor = ThreadPoolExecutor(max_workers=settings.MAX_PARALLEL_TASKS)
-        # Add session maker
-        self.Session = SessionLocal
 
     @classmethod
     def setup_logging(cls):
@@ -46,12 +42,6 @@ class MessageConsumer:
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
-
-    def _initialize_db(self):
-        logger.info("Initializing database connection")
-        Base.metadata.create_all(bind=engine)
-        # Remove self.SessionLocal assignment as we'll use self.Session
-        logger.info("Database connection initialized successfully")
 
     def _connect_to_rabbitmq(self):
         """Establish connection to RabbitMQ with retry mechanism"""
@@ -97,95 +87,111 @@ class MessageConsumer:
     @retry(
         stop=stop_after_attempt(settings.MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=4, max=10),
-        reraise=True
+        reraise=True,
     )
     def _update_event_status(
-        self, message_id: str, status: TaskStatus, result: Dict[str, Any] = None, metadata: Dict[str, Any] = None
+        self,
+        message_id: str,
+        status: TaskStatus,
+        result: Dict[str, Any] = None,
+        metadata: Dict[str, Any] = None,
     ):
         logger.debug(f"Updating event status for message {message_id} to {status}")
-        db_session = self.Session()
-        try:
-            event: Optional[Event] = (
-                db_session.query(Event).filter(Event.message_id == message_id).first()
-            )
-            if event:
-                event.status = status.value
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
                 current_time = datetime.datetime.now(datetime.UTC)
 
-                # Always ensure started_at is set when transitioning to or already in PROCESSING
-                if status == TaskStatus.PROCESSING or (
-                    status in [TaskStatus.COMPLETED, TaskStatus.FAILED] and not event.started_at
-                ):
-                    event.started_at = current_time
+                # First, get the current event
+                cur.execute(
+                    "SELECT started_at FROM events WHERE message_id = %s", (message_id,)
+                )
+                event_data = cur.fetchone()
 
-                # Handle completion timestamp
+                update_fields = ["status = %s"]
+                params = [status.value]
+
+                if status == TaskStatus.PROCESSING:
+                    update_fields.append("started_at = %s")
+                    params.append(current_time)
+
                 if status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
-                    event.completed_at = current_time
-                    if event.started_at:
-                        # Ensure both timestamps are timezone-aware before subtraction
-                        if event.started_at.tzinfo is None:
-                            event.started_at = event.started_at.replace(tzinfo=datetime.UTC)
-                        event.duration = int(
-                            (event.completed_at - event.started_at).total_seconds()
-                        )
+                    update_fields.append("completed_at = %s")
+                    params.append(current_time)
+
+                    # Calculate duration if started_at exists
+                    if event_data and event_data[0]:
+                        duration = int((current_time - event_data[0]).total_seconds())
+                        update_fields.append("duration = %s")
+                        params.append(duration)
+                    else:
+                        # If no started_at, set it now along with duration = 0
+                        update_fields.extend(["started_at = %s", "duration = %s"])
+                        params.extend([current_time, 0])
 
                 if result:
-                    event.result = json.dumps(result)
-                    
-                if metadata:
-                    if 'usage' in metadata:
-                        event.prompt_tokens = metadata['usage'].get('prompt_tokens', 0)
-                        event.completion_tokens = metadata['usage'].get('completion_tokens', 0)
-                        event.total_tokens = metadata['usage'].get('total_tokens', 0)
-                    event.cached = metadata.get('cached', False)
+                    update_fields.append("result = %s")
+                    params.append(json.dumps(result))
 
-                db_session.commit()
-        except Exception as e:
-            logger.error(f"Database error in update_event_status: {str(e)}")
-            db_session.rollback()
-            raise
-        finally:
-            db_session.close()
+                if metadata:
+                    if "usage" in metadata:
+                        update_fields.extend(
+                            [
+                                "prompt_tokens = %s",
+                                "completion_tokens = %s",
+                                "total_tokens = %s",
+                            ]
+                        )
+                        params.extend(
+                            [
+                                metadata["usage"].get("prompt_tokens", 0),
+                                metadata["usage"].get("completion_tokens", 0),
+                                metadata["usage"].get("total_tokens", 0),
+                            ]
+                        )
+                    update_fields.append("cached = %s")
+                    params.append(metadata.get("cached", False))
+
+                params.append(message_id)
+                query = f"""
+                    UPDATE events 
+                    SET {', '.join(update_fields)}
+                    WHERE message_id = %s
+                """
+                cur.execute(query, params)
 
     @retry(
         stop=stop_after_attempt(settings.MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=4, max=10),
-        reraise=True
+        reraise=True,
     )
     def _get_cached_completion(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Check if there's a cached completion for the given payload"""
-        db_session = self.Session()
-        try:
-            # Normalize the payload to match the database format
-            payload_json = json.dumps(payload, sort_keys=True)
+        with pool.connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT result 
+                    FROM events 
+                    WHERE status = %s 
+                    AND payload = %s
+                    ORDER BY created_at ASC 
+                    LIMIT 1
+                """,
+                    (TaskStatus.COMPLETED.value, json.dumps(payload)),
+                )
 
-            # Use direct string comparison with escaped quotes
-            event: Optional[Event] = (
-                db_session.query(Event)
-                .filter(Event.status == TaskStatus.COMPLETED.value)
-                .filter(Event.payload == payload_json)
-                .order_by(Event.created_at.asc())
-                .first()
-            )
-
-            if event and event.result:
-                logger.info("Found cached completion for payload")
-                cached_result = json.loads(event.result)
-                # Reset usage data for cached results
-                cached_result["usage"] = {
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": 0,
-                }
-                cached_result["cached"] = True
-                return cached_result
-            return None
-        except Exception as e:
-            logger.error(f"Error checking cache: {str(e)}")
-            db_session.rollback()
-            raise
-        finally:
-            db_session.close()
+                result = cur.fetchone()
+                if result and result["result"]:
+                    logger.info("Found cached completion for payload")
+                    cached_result = result["result"]
+                    cached_result["usage"] = {
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "total_tokens": 0,
+                    }
+                    cached_result["cached"] = True
+                    return cached_result
+                return None
 
     def process_message(self, ch, method, properties, body):
         # Capture message data
@@ -221,7 +227,7 @@ class MessageConsumer:
                         "completion_tokens": 0,
                         "total_tokens": 0,
                     },
-                    "cached": True
+                    "cached": True,
                 }
                 self._update_event_status(
                     message_id, TaskStatus.COMPLETED, result, metadata
@@ -232,10 +238,8 @@ class MessageConsumer:
             response = send_llm_request(payload)
 
             # Store only the completion in result
-            result = {
-                "completion": response.choices[0].message.content
-            }
-            
+            result = {"completion": response.choices[0].message.content}
+
             # Pass usage and cached status separately
             metadata = {
                 "usage": {
@@ -243,11 +247,13 @@ class MessageConsumer:
                     "completion_tokens": response.usage.completion_tokens,
                     "total_tokens": response.usage.total_tokens,
                 },
-                "cached": False
+                "cached": False,
             }
 
             logger.debug(f"Updating status to COMPLETED for message {message_id}")
-            self._update_event_status(message_id, TaskStatus.COMPLETED, result, metadata)
+            self._update_event_status(
+                message_id, TaskStatus.COMPLETED, result, metadata
+            )
             logger.info(f"Successfully processed message {message_id}")
 
         except concurrent.futures.TimeoutError:

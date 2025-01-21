@@ -4,48 +4,56 @@ import uuid
 import datetime
 from dotenv import load_dotenv
 from schemas.status import TaskStatus
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from models.event import Base, Event
-from core.config import settings
+from database.session import pool
 from aio_pika import connect_robust, Message, DeliveryMode
+from core.config import settings
 
 # Load environment variables
 load_dotenv()
+
 
 class RabbitMQHandler:
     def __init__(self):
         self.connection = None
         self.channel = None
-        self.db_engine = None
-        self.SessionLocal = None
         self._initialize()
 
     def _initialize(self):
-        # Initialize async database connection
-        database_url = (
-            f"postgresql+asyncpg://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
-            f"@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
-        )
-        self.db_engine = create_async_engine(database_url)
+        # Initialize database by ensuring the events table exists
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS events (
+                        id SERIAL PRIMARY KEY,
+                        batch_id VARCHAR(255),
+                        message_id VARCHAR(255) NOT NULL,
+                        status VARCHAR(50) NOT NULL,
+                        payload JSONB,
+                        result JSONB,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        started_at TIMESTAMP WITH TIME ZONE,
+                        completed_at TIMESTAMP WITH TIME ZONE,
+                        duration INTEGER,
+                        prompt_tokens INTEGER,
+                        completion_tokens INTEGER,
+                        total_tokens INTEGER,
+                        cached BOOLEAN DEFAULT FALSE
+                    )
+                """
+                )
 
-        # Create session factory for async sessions
-        self.SessionLocal = sessionmaker(
-            self.db_engine, 
-            class_=AsyncSession, 
-            expire_on_commit=False
-        )
-
-    async def create_tables(self):
-        """Create database tables asynchronously"""
-        async with self.db_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-    def normalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Normalize the payload to ensure consistent field ordering"""
-        if isinstance(payload, dict):
+    def normalize_payload(self, payload):
+        if payload is None:
+            return None
+        elif isinstance(payload, (str, int, float, bool)):
+            return payload
+        elif isinstance(payload, list):
+            return [self.normalize_payload(item) for item in payload]
+        elif isinstance(payload, dict):
             return {k: self.normalize_payload(v) for k, v in sorted(payload.items())}
-        return payload
+        else:
+            return str(payload)
 
     async def connect(self):
         """Establish async connection to RabbitMQ"""
@@ -57,10 +65,7 @@ class RabbitMQHandler:
                 password=settings.RABBITMQ_PASS,
             )
             self.channel = await self.connection.channel()
-            await self.channel.declare_queue(
-                "data_generation_tasks",
-                durable=True
-            )
+            await self.channel.declare_queue("data_generation_tasks", durable=True)
 
     async def ensure_connection(self):
         """Ensure that async connection and channel are available"""
@@ -72,12 +77,14 @@ class RabbitMQHandler:
         except Exception:
             await self.connect()
 
-    async def publish_message(self, message: dict[str, Any], batch_id: str = None) -> str:
+    async def publish_message(
+        self, message: dict[str, Any], batch_id: str = None
+    ) -> str:
         """
         Asynchronously publish a message to RabbitMQ
         """
         await self.ensure_connection()
-        
+
         message_id = str(uuid.uuid4())
         timestamp = datetime.datetime.now(datetime.UTC)
         normalized_payload = self.normalize_payload(message)
@@ -94,24 +101,28 @@ class RabbitMQHandler:
                 body=json.dumps(message_with_metadata).encode(),
                 delivery_mode=DeliveryMode.PERSISTENT,
                 message_id=message_id,
-                headers={"status": TaskStatus.PENDING.value}
+                headers={"status": TaskStatus.PENDING.value},
             )
 
             await self.channel.default_exchange.publish(
-                message,
-                routing_key="data_generation_tasks"
+                message, routing_key="data_generation_tasks"
             )
 
-            async with self.SessionLocal() as db_session:
-                event = Event(
-                    message_id=message_id,
-                    batch_id=batch_id,
-                    created_at=timestamp,
-                    status=TaskStatus.PENDING.value,
-                    payload=json.dumps(normalized_payload),
-                )
-                db_session.add(event)
-                await db_session.commit()
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO events (message_id, batch_id, created_at, status, payload)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """,
+                        (
+                            message_id,
+                            batch_id,
+                            timestamp,
+                            TaskStatus.PENDING.value,
+                            json.dumps(normalized_payload),
+                        ),
+                    )
 
             return message_id
 
@@ -122,22 +133,26 @@ class RabbitMQHandler:
                 body=json.dumps(message_with_metadata).encode(),
                 delivery_mode=DeliveryMode.PERSISTENT,
                 message_id=message_id,
-                headers={"status": TaskStatus.PENDING.value}
+                headers={"status": TaskStatus.PENDING.value},
             )
             await self.channel.default_exchange.publish(
-                message,
-                routing_key="data_generation_tasks"
+                message, routing_key="data_generation_tasks"
             )
-            
-            async with self.SessionLocal() as db_session:
-                event = Event(
-                    message_id=message_id,
-                    batch_id=batch_id,
-                    created_at=timestamp,
-                    status=TaskStatus.PENDING.value,
-                    payload=json.dumps(normalized_payload),
-                )
-                db_session.add(event)
-                await db_session.commit()
+
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO events (message_id, batch_id, created_at, status, payload)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """,
+                        (
+                            message_id,
+                            batch_id,
+                            timestamp,
+                            TaskStatus.PENDING.value,
+                            json.dumps(normalized_payload),
+                        ),
+                    )
 
             return message_id

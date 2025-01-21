@@ -1,12 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from services.message_queue import RabbitMQHandler
 from datetime import datetime
-from sqlalchemy.orm import Session
-from models.event import Event
+from psycopg import Connection
+from psycopg.rows import dict_row
 from database.session import get_db
-from fastapi import Depends
+from schemas.status import TaskStatus
 
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
@@ -60,7 +60,7 @@ async def submit_task(request: TaskRequest):
             "messages": [msg.model_dump() for msg in request.messages],
         }
 
-        message_id = rabbitmq_handler.publish_message(task_data)
+        message_id = await rabbitmq_handler.publish_message(task_data)
 
         return TaskResponse(message_id=message_id)
 
@@ -71,32 +71,60 @@ async def submit_task(request: TaskRequest):
 
 
 @router.get("/tasks/{message_id}", response_model=EventResponse)
-async def get_task_status(message_id: str, db: Session = Depends(get_db)):
+async def get_task_status(message_id: str, db: Connection = Depends(get_db)):
     try:
-        event: Event = db.query(Event).filter(Event.message_id == message_id).first()
+        with db.cursor(row_factory=dict_row) as cur:
+            # Get the event details
+            cur.execute("""
+                SELECT *
+                FROM events
+                WHERE message_id = %s
+            """, (message_id,))
+            
+            event = cur.fetchone()
 
-        if not event:
-            raise HTTPException(
-                status_code=404, detail=f"Task with message_id {message_id} not found"
-            )
+            if not event:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Task with message_id {message_id} not found"
+                )
 
-        # Calculate queue position for pending tasks
-        queue_position = None
-        if event.status == "PENDING":
-            queue_position = db.query(Event).filter(
-                Event.status == "PENDING",
-                Event.created_at <= event.created_at
-            ).count()
+            # Calculate queue position for pending tasks
+            queue_position = None
+            if event['status'] == TaskStatus.PENDING.value:
+                cur.execute("""
+                    SELECT COUNT(*)
+                    FROM events
+                    WHERE status = %s
+                    AND created_at <= %s
+                """, (TaskStatus.PENDING.value, event['created_at']))
+                
+                queue_position = cur.fetchone()['count']
 
-        # Create response with queue position
-        response_dict = {**event.__dict__}
-        response_dict['queue_position'] = queue_position
-        
-        return EventResponse(**response_dict)
+            # Create response dictionary with JSON serialization
+            response_dict = {
+                'message_id': event['message_id'],
+                'batch_id': event['batch_id'],
+                'status': event['status'],
+                'payload': str(event['payload']),  # Convert JSON to string
+                'result': str(event['result']),    # Convert JSON to string
+                'prompt_tokens': event['prompt_tokens'],
+                'completion_tokens': event['completion_tokens'],
+                'total_tokens': event['total_tokens'],
+                'cached': event['cached'] or False,
+                'created_at': event['created_at'],
+                'started_at': event['started_at'],
+                'completed_at': event['completed_at'],
+                'duration': event['duration'],
+                'queue_position': queue_position
+            }
+
+            return EventResponse(**response_dict)
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch task status: {str(e)}"
+            status_code=500, 
+            detail=f"Failed to fetch task status: {str(e)}"
         )

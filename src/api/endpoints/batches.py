@@ -12,7 +12,8 @@ from services.message_queue import RabbitMQHandler
 import json
 import uuid
 from .tasks import TaskRequest
-
+from tenacity import retry, stop_after_attempt, wait_exponential
+from core.config import settings
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
 USE_API_PREFIX = True
@@ -67,6 +68,11 @@ class BatchTasksResponse(BaseModel):
     page_size: int
 
 
+@retry(
+    stop=stop_after_attempt(settings.MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True
+)
 @router.get("/batches/{batch_id}", response_model=BulkTaskStatusResponse)
 async def get_bulk_task_status(batch_id: str, db: Session = Depends(get_db)):
     try:
@@ -180,6 +186,11 @@ async def submit_bulk_tasks(
         )
 
 
+@retry(
+    stop=stop_after_attempt(settings.MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True
+)
 @router.get("/batches/{batch_id}/export")
 async def export_batch_data(
     batch_id: str,
@@ -261,6 +272,11 @@ async def export_batch_data(
         )
 
 
+@retry(
+    stop=stop_after_attempt(settings.MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True
+)
 @router.get("/batches", response_model=BatchListResponse)
 async def list_batches(
     page: int = Query(1, gt=0),
@@ -304,6 +320,11 @@ async def list_batches(
         )
 
 
+@retry(
+    stop=stop_after_attempt(settings.MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True
+)
 @router.get("/batches/{batch_id}/tasks", response_model=BatchTasksResponse)
 async def get_batch_tasks(
     batch_id: str,

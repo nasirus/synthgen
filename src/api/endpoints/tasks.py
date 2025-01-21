@@ -46,6 +46,7 @@ class EventResponse(BaseModel):
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     duration: Optional[int]
+    queue_position: Optional[int]
 
     class Config:
         from_attributes = True  # Allows Pydantic to read data from SQLAlchemy models
@@ -79,7 +80,19 @@ async def get_task_status(message_id: str, db: Session = Depends(get_db)):
                 status_code=404, detail=f"Task with message_id {message_id} not found"
             )
 
-        return event
+        # Calculate queue position for pending tasks
+        queue_position = None
+        if event.status == "PENDING":
+            queue_position = db.query(Event).filter(
+                Event.status == "PENDING",
+                Event.created_at <= event.created_at
+            ).count()
+
+        # Create response with queue position
+        response_dict = {**event.__dict__}
+        response_dict['queue_position'] = queue_position
+        
+        return EventResponse(**response_dict)
 
     except HTTPException:
         raise

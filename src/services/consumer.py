@@ -14,6 +14,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import logging.handlers
 import concurrent.futures
+from utils.llm_utils import send_llm_request
 
 load_dotenv()
 
@@ -136,17 +137,6 @@ class MessageConsumer:
         finally:
             db_session.close()
 
-    @retry(
-        stop=stop_after_attempt(settings.MAX_RETRIES),
-        wait=wait_exponential(multiplier=2, min=4, max=60),
-        reraise=True,
-        before_sleep=lambda retry_state: logger.info(
-            f"Retrying LLM request attempt {retry_state.attempt_number}"
-        ),
-    )
-    def _send_llm_request(self, payload):
-        return completion(model=payload["model"], messages=payload["messages"])
-
     def _get_cached_completion(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Check if there's a cached completion for the given payload"""
         db_session = self.SessionLocal()
@@ -223,7 +213,7 @@ class MessageConsumer:
                 return
 
             logger.debug(f"Sending request to LLM for message {message_id}")
-            response = self._send_llm_request(payload)
+            response = send_llm_request(payload)
 
             # Store only the completion in result
             result = {

@@ -28,7 +28,7 @@ class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
     # Maximum number of parallel tasks
-    MAX_PARALLEL_TASKS: int = int(os.getenv("MAX_PARALLEL_TASKS", 10))
+    MAX_PARALLEL_TASKS: int = int(os.getenv("MAX_PARALLEL_TASKS", 100))
 
     # Maximum number of retries
     MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", 3))

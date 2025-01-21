@@ -30,7 +30,7 @@ def write_tasks_to_jsonl(tasks, output_file="tasks.jsonl"):
 
 if __name__ == "__main__":
     model_name = "openrouter/meta-llama/llama-3.2-1b-instruct"
-    n_samples = 100
+    n_samples = 1000
     # Load dataset
     dataset = load_wildcat_dataset(n_samples=n_samples)
     

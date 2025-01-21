@@ -97,67 +97,80 @@ class MessageConsumer:
         metadata: Dict[str, Any] = None,
     ):
         logger.debug(f"Updating event status for message {message_id} to {status}")
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
-                current_time = datetime.datetime.now(datetime.UTC)
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    current_time = datetime.datetime.now(datetime.UTC)
 
-                # First, get the current event
-                cur.execute(
-                    "SELECT started_at FROM events WHERE message_id = %s", (message_id,)
-                )
-                event_data = cur.fetchone()
+                    update_fields = ["status = %s"]
+                    params = [status.value]
 
-                update_fields = ["status = %s"]
-                params = [status.value]
+                    if status == TaskStatus.PROCESSING:
+                        update_fields.append("started_at = %s")
+                        params.append(current_time)
 
-                if status == TaskStatus.PROCESSING:
-                    update_fields.append("started_at = %s")
-                    params.append(current_time)
+                    if status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
+                        update_fields.append("completed_at = %s")
+                        params.append(current_time)
 
-                if status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
-                    update_fields.append("completed_at = %s")
-                    params.append(current_time)
-
-                    # Calculate duration if started_at exists
-                    if event_data and event_data[0]:
-                        duration = int((current_time - event_data[0]).total_seconds())
-                        update_fields.append("duration = %s")
-                        params.append(duration)
-                    else:
-                        # If no started_at, set it now along with duration = 0
-                        update_fields.extend(["started_at = %s", "duration = %s"])
-                        params.extend([current_time, 0])
-
-                if result:
-                    update_fields.append("result = %s")
-                    params.append(json.dumps(result))
-
-                if metadata:
-                    if "usage" in metadata:
-                        update_fields.extend(
-                            [
-                                "prompt_tokens = %s",
-                                "completion_tokens = %s",
-                                "total_tokens = %s",
-                            ]
+                        cur.execute(
+                            "SELECT started_at FROM events WHERE message_id = %s",
+                            (message_id,),
                         )
-                        params.extend(
-                            [
-                                metadata["usage"].get("prompt_tokens", 0),
-                                metadata["usage"].get("completion_tokens", 0),
-                                metadata["usage"].get("total_tokens", 0),
-                            ]
-                        )
-                    update_fields.append("cached = %s")
-                    params.append(metadata.get("cached", False))
+                        event_data = cur.fetchone()
+                        # Calculate duration if started_at exists
+                        if event_data and event_data[0]:
+                            duration = int(
+                                (current_time - event_data[0]).total_seconds()
+                            )
+                            update_fields.append("duration = %s")
+                            params.append(duration)
+                        else:
+                            # If no started_at, set it now along with duration = 0
+                            update_fields.extend(["started_at = %s", "duration = %s"])
+                            params.extend([current_time, 0])
 
-                params.append(message_id)
-                query = f"""
-                    UPDATE events 
-                    SET {', '.join(update_fields)}
-                    WHERE message_id = %s
-                """
-                cur.execute(query, params)
+                    if result:
+                        update_fields.append("result = %s")
+                        params.append(json.dumps(result))
+
+                    if metadata:
+                        if "usage" in metadata:
+                            update_fields.extend(
+                                [
+                                    "prompt_tokens = %s",
+                                    "completion_tokens = %s",
+                                    "total_tokens = %s",
+                                ]
+                            )
+                            params.extend(
+                                [
+                                    metadata["usage"].get("prompt_tokens", 0),
+                                    metadata["usage"].get("completion_tokens", 0),
+                                    metadata["usage"].get("total_tokens", 0),
+                                ]
+                            )
+                        update_fields.append("cached = %s")
+                        params.append(metadata.get("cached", False))
+
+                    params.append(message_id)
+                    query = f"""
+                        UPDATE events 
+                        SET {', '.join(update_fields)}
+                        WHERE message_id = %s
+                    """
+                    cur.execute(query, params)
+        except psycopg.errors.UnicodeError as e:
+            logger.error(
+                f"Unicode error while updating status for message {message_id}: {str(e)}"
+            )
+            # Update status as failed with the error message
+            self._update_event_status(
+                message_id,
+                TaskStatus.FAILED,
+                {"error": f"Database encoding error: {str(e)}"},
+            )
+            raise
 
     @retry(
         stop=stop_after_attempt(settings.MAX_RETRIES),

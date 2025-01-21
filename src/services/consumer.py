@@ -1,7 +1,7 @@
 import json
 import pika
 from litellm import completion
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 from models.event import Base, Event
 from schemas.status import TaskStatus
@@ -20,6 +20,7 @@ load_dotenv()
 # Create a single logger instance at module level
 logger = logging.getLogger(__name__)
 
+
 class MessageConsumer:
     def __init__(self):
         # Remove any logging setup from __init__
@@ -34,10 +35,12 @@ class MessageConsumer:
     def setup_logging(cls):
         # Remove all existing handlers
         logger.handlers.clear()
-        
+
         # Add single handler with formatter
         handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -95,16 +98,25 @@ class MessageConsumer:
         logger.debug(f"Updating event status for message {message_id} to {status}")
         db_session = self.SessionLocal()
         try:
-            event = (
+            event: Optional[Event] = (
                 db_session.query(Event).filter(Event.message_id == message_id).first()
             )
             if event:
                 event.status = status.value
+
+                # Handle timestamps based on status
+                if status == TaskStatus.PROCESSING:
+                    event.started_at = datetime.today()
+                elif status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
+                    event.completed_at = datetime.today()
+                    if event.started_at:
+                        event.duration = int(
+                            (event.completed_at - event.started_at).total_seconds()
+                        )
+
                 if result:
                     event.result = json.dumps(result)
-                updated_at = datetime.now()
-                event.updated_at = updated_at
-                event.duration = (updated_at - event.created_at).total_seconds()
+
                 db_session.commit()
         finally:
             db_session.close()
@@ -128,10 +140,11 @@ class MessageConsumer:
             payload_json = json.dumps(payload, sort_keys=True)
 
             # Use direct string comparison with escaped quotes
-            event = (
+            event: Optional[Event] = (
                 db_session.query(Event)
                 .filter(Event.status == TaskStatus.COMPLETED.value)
                 .filter(Event.payload == payload_json)
+                .order_by(Event.created_at.asc())
                 .first()
             )
 
@@ -169,9 +182,7 @@ class MessageConsumer:
     def process_message_async(self, ch, method, body, message_id, payload):
         start_time = time.time()
         try:
-            logger.debug(
-                f"No cache found. Updating status to PROCESSING for message {message_id}"
-            )
+            logger.debug(f"Updating status to PROCESSING for message {message_id}")
             self._update_event_status(message_id, TaskStatus.PROCESSING)
 
             logger.debug(f"Checking cache for message {message_id}")
@@ -227,9 +238,7 @@ class MessageConsumer:
         if ch.is_open:
             ch.basic_ack(delivery_tag)
         else:
-            logger.warning(
-                "Channel closed, message %s not acknowledged", delivery_tag
-            )
+            logger.warning("Channel closed, message %s not acknowledged", delivery_tag)
 
     def start_consuming(self):
         """Start consuming messages with automatic recovery"""
@@ -262,10 +271,10 @@ class MessageConsumer:
 
 if __name__ == "__main__":
     import time
-    
+
     # Setup logging once at startup
     MessageConsumer.setup_logging()
-    
+
     try:
         consumer = MessageConsumer()
         consumer.start_consuming()

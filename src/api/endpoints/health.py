@@ -13,6 +13,8 @@ class ServiceStatus(BaseModel):
     api: Literal["healthy", "unhealthy"] = "healthy"
     rabbitmq: Literal["healthy", "unhealthy"] = "unhealthy"
     postgres: Literal["healthy", "unhealthy"] = "unhealthy"
+    queue_consumers: int = 0
+    queue_messages: int = 0
 
 
 class HealthResponse(BaseModel):
@@ -37,6 +39,13 @@ async def health_check():
             credentials=credentials,
         )
         connection = pika.BlockingConnection(parameters)
+        channel = connection.channel()
+        
+        # Get queue information
+        queue_info = channel.queue_declare(queue='data_generation_tasks', passive=True)
+        services.queue_messages = queue_info.method.message_count
+        services.queue_consumers = queue_info.method.consumer_count
+        
         connection.close()
         services.rabbitmq = "healthy"
     except Exception as e:

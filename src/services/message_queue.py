@@ -1,17 +1,17 @@
 import json
-import pika
+from typing import Any
 import uuid
 import datetime
 from dotenv import load_dotenv
 from schemas.status import TaskStatus
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from models.event import Base, Event
 from core.config import settings
+from aio_pika import connect_robust, Message, DeliveryMode
 
 # Load environment variables
 load_dotenv()
-
 
 class RabbitMQHandler:
     def __init__(self):
@@ -22,126 +22,122 @@ class RabbitMQHandler:
         self._initialize()
 
     def _initialize(self):
-        # Initialize database connection
+        # Initialize async database connection
         database_url = (
-            f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
+            f"postgresql+asyncpg://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
             f"@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
         )
-        self.db_engine = create_engine(database_url)
+        self.db_engine = create_async_engine(database_url)
 
-        # Create tables if they don't exist
-        Base.metadata.create_all(bind=self.db_engine)
-
-        # Create session factory
+        # Create session factory for async sessions
         self.SessionLocal = sessionmaker(
-            autocommit=False, autoflush=False, bind=self.db_engine
+            self.db_engine, 
+            class_=AsyncSession, 
+            expire_on_commit=False
         )
 
-        # Initialize RabbitMQ connection
-        self.connect()
+    async def create_tables(self):
+        """Create database tables asynchronously"""
+        async with self.db_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-        # Declare the queue with consistent parameters
-        self.channel.queue_declare(
-            queue="data_generation_tasks",
-            durable=True,
-        )
-
-    def connect(self):
-        if not self.connection or self.connection.is_closed:
-            credentials = pika.PlainCredentials(
-                username=settings.RABBITMQ_USER,
-                password=settings.RABBITMQ_PASS,
-            )
-            parameters = pika.ConnectionParameters(
-                host=settings.RABBITMQ_HOST,
-                port=settings.RABBITMQ_PORT,
-                credentials=credentials,
-            )
-            self.connection = pika.BlockingConnection(parameters)
-            self.channel = self.connection.channel()
-
-    def ensure_connection(self):
-        """Ensure that connection and channel are available"""
-        try:
-            if not self.connection or self.connection.is_closed:
-                self.connect()
-            elif not self.channel or self.channel.is_closed:
-                self.channel = self.connection.channel()
-                # Don't declare the queue here, as it's already declared in connect()
-        except (
-            pika.exceptions.AMQPConnectionError,
-            pika.exceptions.AMQPChannelError
-        ):
-            # If there's any connection issue, try to reconnect
-            self.connect()
-
-    def normalize_payload(self, payload):
+    def normalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Normalize the payload to ensure consistent field ordering"""
         if isinstance(payload, dict):
-            # Sort keys and recursively normalize nested dictionaries
             return {k: self.normalize_payload(v) for k, v in sorted(payload.items())}
-        elif isinstance(payload, list):
-            # Normalize each item in the list
-            return [self.normalize_payload(item) for item in payload]
-        else:
-            # Return the item as is if it's not a dict or list
-            return payload
+        return payload
 
-    def publish_message(self, message, batch_id: str = None) -> str:
-        self.ensure_connection()
-        # Generate a unique message ID
+    async def connect(self):
+        """Establish async connection to RabbitMQ"""
+        if not self.connection or self.connection.is_closed:
+            self.connection = await connect_robust(
+                host=settings.RABBITMQ_HOST,
+                port=settings.RABBITMQ_PORT,
+                login=settings.RABBITMQ_USER,
+                password=settings.RABBITMQ_PASS,
+            )
+            self.channel = await self.connection.channel()
+            await self.channel.declare_queue(
+                "data_generation_tasks",
+                durable=True
+            )
+
+    async def ensure_connection(self):
+        """Ensure that async connection and channel are available"""
+        try:
+            if not self.connection or self.connection.is_closed:
+                await self.connect()
+            elif not self.channel or self.channel.is_closed:
+                self.channel = await self.connection.channel()
+        except Exception:
+            await self.connect()
+
+    async def publish_message(self, message: dict[str, Any], batch_id: str = None) -> str:
+        """
+        Asynchronously publish a message to RabbitMQ
+        """
+        await self.ensure_connection()
+        
         message_id = str(uuid.uuid4())
-        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
-
-        # Normalize the payload to ensure consistent field ordering
+        timestamp = datetime.datetime.now(datetime.UTC)
         normalized_payload = self.normalize_payload(message)
 
-        # Add metadata to the message
         message_with_metadata = {
             "message_id": message_id,
-            "timestamp": timestamp,
+            "timestamp": timestamp.isoformat(),
             "payload": normalized_payload,
             "batch_id": batch_id,
         }
 
-        # Publish message to RabbitMQ
         try:
-            self.channel.basic_publish(
-                exchange="",
-                routing_key="data_generation_tasks",
-                body=json.dumps(message_with_metadata),
-                properties=pika.BasicProperties(
-                    delivery_mode=2,  # make message persistent
-                    message_id=message_id,
-                ),
-            )
-        except (pika.exceptions.AMQPConnectionError, pika.exceptions.AMQPChannelError):
-            # If publishing fails due to connection issues, try one more time
-            self.connect()
-            self.channel.basic_publish(
-                exchange="",
-                routing_key="data_generation_tasks",
-                body=json.dumps(message_with_metadata),
-                properties=pika.BasicProperties(
-                    delivery_mode=2,
-                    message_id=message_id,
-                    headers={"status": TaskStatus.PENDING.value},
-                ),
-            )
-
-        # Log event to database
-        db_session = self.SessionLocal()
-        try:
-            event = Event(
+            message = Message(
+                body=json.dumps(message_with_metadata).encode(),
+                delivery_mode=DeliveryMode.PERSISTENT,
                 message_id=message_id,
-                batch_id=batch_id,
-                created_at=timestamp,
-                status=TaskStatus.PENDING.value,
-                payload=json.dumps(normalized_payload),
+                headers={"status": TaskStatus.PENDING.value}
             )
-            db_session.add(event)
-            db_session.commit()
-        finally:
-            db_session.close()
 
-        return message_id
+            await self.channel.default_exchange.publish(
+                message,
+                routing_key="data_generation_tasks"
+            )
+
+            async with self.SessionLocal() as db_session:
+                event = Event(
+                    message_id=message_id,
+                    batch_id=batch_id,
+                    created_at=timestamp,
+                    status=TaskStatus.PENDING.value,
+                    payload=json.dumps(normalized_payload),
+                )
+                db_session.add(event)
+                await db_session.commit()
+
+            return message_id
+
+        except Exception:
+            # If first attempt fails, try one more time
+            await self.connect()
+            message = Message(
+                body=json.dumps(message_with_metadata).encode(),
+                delivery_mode=DeliveryMode.PERSISTENT,
+                message_id=message_id,
+                headers={"status": TaskStatus.PENDING.value}
+            )
+            await self.channel.default_exchange.publish(
+                message,
+                routing_key="data_generation_tasks"
+            )
+            
+            async with self.SessionLocal() as db_session:
+                event = Event(
+                    message_id=message_id,
+                    batch_id=batch_id,
+                    created_at=timestamp,
+                    status=TaskStatus.PENDING.value,
+                    payload=json.dumps(normalized_payload),
+                )
+                db_session.add(event)
+                await db_session.commit()
+
+            return message_id

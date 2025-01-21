@@ -95,7 +95,7 @@ class MessageConsumer:
             self._connect_to_rabbitmq()
 
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(settings.MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=4, max=10),
         reraise=True
     )
@@ -148,7 +148,7 @@ class MessageConsumer:
             db_session.close()
 
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(settings.MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=4, max=10),
         reraise=True
     )

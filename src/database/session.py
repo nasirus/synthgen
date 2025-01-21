@@ -10,11 +10,11 @@ DATABASE_URL = (
 
 engine = create_engine(
     DATABASE_URL,
-    pool_size=20,  # Increase from default 5
-    max_overflow=20,  # Increase from default 10
-    pool_timeout=60,  # Increase from default 30
-    pool_pre_ping=True,  # Enable connection health checks
-    pool_recycle=3600,  # Recycle connections after 1 hour
+    pool_size=100,
+    max_overflow=100,
+    pool_timeout=60,
+    pool_pre_ping=True,
+    pool_recycle=3600,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

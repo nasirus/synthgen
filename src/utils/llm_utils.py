@@ -6,6 +6,7 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 @retry(
     stop=stop_after_attempt(settings.MAX_RETRIES),
     wait=wait_exponential(multiplier=2, min=4, max=60),
@@ -17,17 +18,18 @@ logger = logging.getLogger(__name__)
 def send_llm_request(payload: Dict[str, Any]) -> Any:
     """
     Send a request to the LLM with retry mechanism.
-    
+
     Args:
         payload (Dict[str, Any]): The request payload containing model and messages
-        
+
     Returns:
         Any: The LLM response
-        
+
     Raises:
         Exception: If the LLM request fails after all retries
     """
     return completion(
         model=payload["model"],
-        messages=payload["messages"]
-    ) 
+        messages=payload["messages"],
+        timeout=settings.LLM_TIMEOUT,
+    )

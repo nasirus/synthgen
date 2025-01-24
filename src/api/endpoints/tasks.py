@@ -143,26 +143,20 @@ async def get_task_status(message_id: str, db: Connection = Depends(get_db)):
 async def delete_task(message_id: str, db: Connection = Depends(get_db)):
     try:
         with db.cursor(row_factory=dict_row) as cur:
-            # First check if the task exists
+            # Delete and check if any row was affected
             cur.execute(
-                "SELECT COUNT(*) FROM events WHERE message_id = %s",
+                "DELETE FROM events WHERE message_id = %s RETURNING message_id",
                 (message_id,)
             )
-            count = cur.fetchone()["count"]
+            deleted = cur.fetchone()
             
-            if count == 0:
+            if not deleted:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Task with message_id {message_id} not found"
                 )
             
-            # Delete the event
-            cur.execute(
-                "DELETE FROM events WHERE message_id = %s",
-                (message_id,)
-            )
             db.commit()
-            
             return None
 
     except HTTPException:

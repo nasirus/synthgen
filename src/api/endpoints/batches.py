@@ -80,10 +80,10 @@ class BulkTaskResponse(BaseModel):
 
 
 class BatchListResponse(BaseModel):
-    batches: List[BulkTaskStatusResponse]
     total: int
     page: int
     page_size: int
+    batches: List[BulkTaskStatusResponse]
 
 
 class TaskDetail(BaseModel):
@@ -273,66 +273,62 @@ async def export_batch_data(
     try:
         fields = include_fields.split(",") if include_fields else None
 
+        # Check first chunk for existence
+        with db.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM events
+                WHERE batch_id = %s
+                ORDER BY created_at
+                LIMIT %s
+                """,
+                (batch_id, chunk_size),
+            )
+            first_chunk = cur.fetchall()
+
+            if not first_chunk:
+                raise HTTPException(
+                    status_code=404, detail=f"No tasks found for batch_id {batch_id}"
+                )
+
         async def generate_data():
-            offset = 0
-            with db.cursor(row_factory=dict_row) as cur:
-                while True:
-                    cur.execute(
-                        """
-                        SELECT *
-                        FROM events
-                        WHERE batch_id = %s
-                        ORDER BY created_at
-                        LIMIT %s OFFSET %s
-                    """,
-                        (batch_id, chunk_size, offset),
-                    )
+            # Yield first chunk
+            for event in first_chunk:
+                event_data = {
+                    # Identifiers
+                    "batch_id": event["batch_id"],
+                    "message_id": str(event["message_id"]),
+                    # Status and Result
+                    "status": event["status"],
+                    "cached": event["cached"] or False,
+                    # Input/Output
+                    "payload": event["payload"],
+                    "result": event["result"],
+                    # Timing Information
+                    "created_at": event["created_at"].isoformat(),
+                    "started_at": (
+                        event["started_at"].isoformat() if event["started_at"] else None
+                    ),
+                    "completed_at": (
+                        event["completed_at"].isoformat()
+                        if event["completed_at"]
+                        else None
+                    ),
+                    "duration": event["duration"],
+                    # Token Usage
+                    "prompt_tokens": event["prompt_tokens"],
+                    "completion_tokens": event["completion_tokens"],
+                    "total_tokens": event["total_tokens"],
+                }
 
-                    events = cur.fetchall()
-                    if not events:
-                        break
+                if fields:
+                    event_data = {k: v for k, v in event_data.items() if k in fields}
 
-                    for event in events:
-                        event_data = {
-                            # Identifiers
-                            "batch_id": event["batch_id"],
-                            "message_id": str(event["message_id"]),
-                            # Status and Result
-                            "status": event["status"],
-                            "cached": event["cached"] or False,
-                            # Input/Output
-                            "payload": event["payload"],
-                            "result": event["result"],
-                            # Timing Information
-                            "created_at": event["created_at"].isoformat(),
-                            "started_at": (
-                                event["started_at"].isoformat()
-                                if event["started_at"]
-                                else None
-                            ),
-                            "completed_at": (
-                                event["completed_at"].isoformat()
-                                if event["completed_at"]
-                                else None
-                            ),
-                            "duration": event["duration"],
-                            # Token Usage
-                            "prompt_tokens": event["prompt_tokens"],
-                            "completion_tokens": event["completion_tokens"],
-                            "total_tokens": event["total_tokens"],
-                        }
-
-                        if fields:
-                            event_data = {
-                                k: v for k, v in event_data.items() if k in fields
-                            }
-
-                        if format == "jsonl":
-                            yield json.dumps(event_data) + "\n"
-                        elif format == "json":
-                            yield json.dumps(event_data) + ","
-
-                    offset += chunk_size
+                if format == "jsonl":
+                    yield json.dumps(event_data) + "\n"
+                elif format == "json":
+                    yield json.dumps(event_data) + ","
 
         filename = f"batch_{batch_id}_export.{format}"
         headers = {
@@ -491,25 +487,18 @@ async def delete_batch(batch_id: str, db: Connection = Depends(get_db)):
     try:
         with db.cursor(row_factory=dict_row) as cur:
             # First check if the batch exists
-            cur.execute(
-                "SELECT COUNT(*) FROM events WHERE batch_id = %s",
-                (batch_id,)
-            )
+            cur.execute("SELECT COUNT(*) FROM events WHERE batch_id = %s", (batch_id,))
             count = cur.fetchone()["count"]
-            
+
             if count == 0:
                 raise HTTPException(
-                    status_code=404,
-                    detail=f"Batch {batch_id} not found"
+                    status_code=404, detail=f"Batch {batch_id} not found"
                 )
-            
+
             # Delete all events associated with the batch
-            cur.execute(
-                "DELETE FROM events WHERE batch_id = %s",
-                (batch_id,)
-            )
+            cur.execute("DELETE FROM events WHERE batch_id = %s", (batch_id,))
             db.commit()
-            
+
             logger.info(f"Successfully deleted batch {batch_id}")
             return None
 
@@ -517,7 +506,4 @@ async def delete_batch(batch_id: str, db: Connection = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Failed to delete batch {batch_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete batch: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete batch: {str(e)}")

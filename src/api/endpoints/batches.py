@@ -7,15 +7,14 @@ from fastapi import (
     Query,
     BackgroundTasks,
 )
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from psycopg import Connection
 from psycopg.rows import dict_row
+from schemas.batch import Batch
 from schemas.task import Task
 from schemas.task_status import TaskStatus
 from database.session import get_db
-from datetime import datetime
-from typing import Optional, List
+from typing import List
 from services.message_queue import RabbitMQHandler
 import json
 import uuid
@@ -51,30 +50,6 @@ def setup_logging():
 setup_logging()
 
 
-class BulkTaskStatusResponse(BaseModel):
-    # Identifiers
-    batch_id: str
-
-    # Status Overview
-    batch_status: TaskStatus
-    total_tasks: int
-    completed_tasks: int
-    failed_tasks: int
-    pending_tasks: int
-    cached_tasks: int
-
-    # Timing Information
-    created_at: datetime
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    duration: Optional[int]
-
-    # Token Usage
-    total_tokens: int
-    prompt_tokens: int
-    completion_tokens: int
-
-
 class BulkTaskResponse(BaseModel):
     batch_id: str
     rows: int
@@ -84,7 +59,7 @@ class BatchListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    batches: List[BulkTaskStatusResponse]
+    batches: List[Batch]
 
 
 class BatchTasksResponse(BaseModel):
@@ -99,7 +74,7 @@ class BatchTasksResponse(BaseModel):
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
-@router.get("/batches/{batch_id}", response_model=BulkTaskStatusResponse)
+@router.get("/batches/{batch_id}", response_model=Batch)
 async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
     logger.info(f"Fetching status for batch {batch_id}")
     try:
@@ -144,7 +119,7 @@ async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
             else TaskStatus.FAILED if failed_count > 0 else TaskStatus.COMPLETED
         )
 
-        response = BulkTaskStatusResponse(
+        response = Batch(
             batch_id=batch_id,
             batch_status=batch_status,
             created_at=batch_stats["created_at"],

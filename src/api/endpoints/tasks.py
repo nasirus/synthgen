@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from services.message_queue import RabbitMQHandler
 from psycopg import Connection
 from psycopg.rows import dict_row
@@ -9,6 +9,7 @@ from schemas.status import TaskStatus
 from schemas.task import Task
 from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
+from datetime import datetime
 
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
@@ -31,6 +32,13 @@ class TaskRequest(BaseModel):
     messages: List[Message] = Field(
         ..., description="List of messages for the conversation"
     )
+
+
+class TaskListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    tasks: List[Task]
 
 
 @router.post("/tasks", response_model=EventResponse)
@@ -150,3 +158,82 @@ async def delete_task(message_id: str, db: Connection = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete task: {str(e)}")
+
+
+@retry(
+    stop=stop_after_attempt(settings.MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True,
+)
+@router.get("/tasks", response_model=TaskListResponse)
+async def list_tasks(
+    page: int = Query(1, gt=0),
+    page_size: int = Query(50, gt=0, le=100),
+    db: Connection = Depends(get_db),
+):
+    try:
+        offset = (page - 1) * page_size
+
+        with db.cursor(row_factory=dict_row) as cur:
+            # Get total count of individual tasks (where batch_id is NULL)
+            cur.execute(
+                "SELECT COUNT(*) FROM events WHERE batch_id IS NULL"
+            )
+            total_tasks = cur.fetchone()["count"]
+
+            # Get paginated tasks
+            cur.execute(
+                """
+                SELECT 
+                    message_id,
+                    status,
+                    prompt_tokens,
+                    completion_tokens,
+                    total_tokens,
+                    cached,
+                    created_at,
+                    started_at,
+                    completed_at,
+                    duration
+                FROM events
+                WHERE batch_id IS NULL
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (page_size, offset),
+            )
+
+            tasks = cur.fetchall()
+
+            task_list = [
+                Task(
+                    message_id=str(task["message_id"]),
+                    batch_id=None,
+                    status=task["status"],
+                    payload=None,
+                    result=None,
+                    prompt_tokens=task["prompt_tokens"],
+                    completion_tokens=task["completion_tokens"],
+                    total_tokens=task["total_tokens"],
+                    cached=task["cached"] or False,
+                    created_at=task["created_at"],
+                    started_at=task["started_at"] if task["started_at"] else None,
+                    completed_at=task["completed_at"] if task["completed_at"] else None,
+                    duration=task["duration"],
+                    queue_position=None,
+                )
+                for task in tasks
+            ]
+
+            return TaskListResponse(
+                tasks=task_list,
+                total=total_tasks,
+                page=page,
+                page_size=page_size
+            )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task list: {str(e)}"
+        )

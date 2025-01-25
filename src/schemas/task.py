@@ -8,7 +8,7 @@ class Task(BaseModel):
     message_id: str
     batch_id: Optional[str]
     status: TaskStatus
-    payload: dict
+    payload: Optional[dict]
     result: Optional[dict]
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]

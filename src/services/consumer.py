@@ -2,7 +2,7 @@ import json
 import pika
 from typing import Dict, Any
 import datetime
-from schemas.status import TaskStatus
+from schemas.task_status import TaskStatus
 from core.config import settings
 import logging
 from dotenv import load_dotenv

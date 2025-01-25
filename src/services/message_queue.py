@@ -3,7 +3,7 @@ from typing import Any
 import uuid
 import datetime
 from dotenv import load_dotenv
-from schemas.status import TaskStatus
+from schemas.task_status import TaskStatus
 from database.session import pool
 from aio_pika import connect_robust, Message, DeliveryMode
 from core.config import settings

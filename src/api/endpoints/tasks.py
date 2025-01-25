@@ -5,7 +5,7 @@ from services.message_queue import RabbitMQHandler
 from psycopg import Connection
 from psycopg.rows import dict_row
 from database.session import get_db
-from schemas.status import TaskStatus
+from schemas.task_status import TaskStatus
 from schemas.task import Task
 from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings

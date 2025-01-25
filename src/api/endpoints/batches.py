@@ -11,7 +11,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from psycopg import Connection
 from psycopg.rows import dict_row
-from schemas.status import TaskStatus
+from schemas.task import Task
+from schemas.task_status import TaskStatus
 from database.session import get_db
 from datetime import datetime
 from typing import Optional, List
@@ -86,35 +87,11 @@ class BatchListResponse(BaseModel):
     batches: List[BulkTaskStatusResponse]
 
 
-class TaskDetail(BaseModel):
-    # Identifiers
-    message_id: str
-
-    # Status and Result
-    status: TaskStatus
-    cached: Optional[bool]
-
-    # Input/Output
-    payload: dict
-    result: Optional[dict]
-
-    # Timing Information
-    created_at: datetime
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    duration: Optional[int]
-
-    # Token Usage
-    total_tokens: Optional[int]
-    prompt_tokens: Optional[int]
-    completion_tokens: Optional[int]
-
-
 class BatchTasksResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    tasks: List[TaskDetail]
+    tasks: List[Task]
 
 
 @retry(
@@ -460,8 +437,9 @@ async def get_batch_tasks(
             )
 
         task_details = [
-            TaskDetail(
+            Task(
                 message_id=str(task["message_id"]),
+                batch_id=task["batch_id"],
                 status=TaskStatus(task["status"]),
                 cached=task["cached"] or False,
                 payload=task["payload"],
@@ -473,6 +451,7 @@ async def get_batch_tasks(
                 total_tokens=task["total_tokens"],
                 prompt_tokens=task["prompt_tokens"],
                 completion_tokens=task["completion_tokens"],
+                queue_position=None,
             )
             for task in tasks
         ]

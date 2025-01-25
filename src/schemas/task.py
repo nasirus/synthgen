@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from schemas.status import TaskStatus
+from schemas.task_status import TaskStatus
 
 
 class Task(BaseModel):

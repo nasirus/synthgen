@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List
 from services.message_queue import RabbitMQHandler
 from psycopg import Connection
 from psycopg.rows import dict_row
@@ -9,7 +9,6 @@ from schemas.status import TaskStatus
 from schemas.task import Task
 from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
-from datetime import datetime
 
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()

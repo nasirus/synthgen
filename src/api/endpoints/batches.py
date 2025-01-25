@@ -111,10 +111,10 @@ class TaskDetail(BaseModel):
 
 
 class BatchTasksResponse(BaseModel):
-    tasks: List[TaskDetail]
     total: int
     page: int
     page_size: int
+    tasks: List[TaskDetail]
 
 
 @retry(
@@ -167,25 +167,25 @@ async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
             else TaskStatus.FAILED if failed_count > 0 else TaskStatus.COMPLETED
         )
 
-        response_data = {
-            "batch_id": batch_id,
-            "batch_status": batch_status,
-            "created_at": batch_stats["created_at"],
-            "started_at": batch_stats["started_at"],
-            "completed_at": batch_stats["completed_at"],
-            "duration": batch_stats["duration"],
-            "total_tasks": batch_stats["total_count"],
-            "completed_tasks": completed_count,
-            "failed_tasks": failed_count,
-            "pending_tasks": pending_count,
-            "cached_tasks": batch_stats["cached_count"],
-            "total_tokens": batch_stats["total_tokens"] or 0,
-            "prompt_tokens": batch_stats["prompt_tokens"] or 0,
-            "completion_tokens": batch_stats["completion_tokens"] or 0,
-        }
+        response = BulkTaskStatusResponse(
+            batch_id=batch_id,
+            batch_status=batch_status,
+            created_at=batch_stats["created_at"],
+            started_at=batch_stats["started_at"],
+            completed_at=batch_stats["completed_at"],
+            duration=batch_stats["duration"],
+            total_tasks=batch_stats["total_count"],
+            completed_tasks=completed_count,
+            failed_tasks=failed_count,
+            pending_tasks=pending_count,
+            cached_tasks=batch_stats["cached_count"],
+            total_tokens=batch_stats["total_tokens"] or 0,
+            prompt_tokens=batch_stats["prompt_tokens"] or 0,
+            completion_tokens=batch_stats["completion_tokens"] or 0,
+        )
 
         logger.info(f"Successfully retrieved status for batch {batch_id}")
-        return BulkTaskStatusResponse(**response_data)
+        return response
 
     except HTTPException:
         logger.error(f"HTTP error while fetching batch {batch_id}")
@@ -271,64 +271,75 @@ async def export_batch_data(
 ) -> StreamingResponse:
     logger.info(f"Exporting batch {batch_id} data in {format} format")
     try:
-        fields = include_fields.split(",") if include_fields else None
-
-        # Check first chunk for existence
+        # Move batch validation to the beginning
         with db.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                """
-                SELECT *
-                FROM events
-                WHERE batch_id = %s
-                ORDER BY created_at
-                LIMIT %s
-                """,
-                (batch_id, chunk_size),
+                "SELECT EXISTS(SELECT 1 FROM events WHERE batch_id = %s)",
+                (batch_id,)
             )
-            first_chunk = cur.fetchall()
-
-            if not first_chunk:
+            if not cur.fetchone()["exists"]:
                 raise HTTPException(
                     status_code=404, detail=f"No tasks found for batch_id {batch_id}"
                 )
 
+        fields = include_fields.split(",") if include_fields else None
+
         async def generate_data():
-            # Yield first chunk
-            for event in first_chunk:
-                event_data = {
-                    # Identifiers
-                    "batch_id": event["batch_id"],
-                    "message_id": str(event["message_id"]),
-                    # Status and Result
-                    "status": event["status"],
-                    "cached": event["cached"] or False,
-                    # Input/Output
-                    "payload": event["payload"],
-                    "result": event["result"],
-                    # Timing Information
-                    "created_at": event["created_at"].isoformat(),
-                    "started_at": (
-                        event["started_at"].isoformat() if event["started_at"] else None
-                    ),
-                    "completed_at": (
-                        event["completed_at"].isoformat()
-                        if event["completed_at"]
-                        else None
-                    ),
-                    "duration": event["duration"],
-                    # Token Usage
-                    "prompt_tokens": event["prompt_tokens"],
-                    "completion_tokens": event["completion_tokens"],
-                    "total_tokens": event["total_tokens"],
-                }
+            offset = 0
+            while True:
+                with db.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        """
+                        SELECT *
+                        FROM events
+                        WHERE batch_id = %s
+                        ORDER BY created_at
+                        LIMIT %s OFFSET %s
+                        """,
+                        (batch_id, chunk_size, offset),
+                    )
+                    chunk = cur.fetchall()
+                    
+                    if not chunk:
+                        break
+                    
+                    for event in chunk:
+                        event_data = {
+                            # Identifiers
+                            "batch_id": event["batch_id"],
+                            "message_id": str(event["message_id"]),
+                            # Status and Result
+                            "status": event["status"],
+                            "cached": event["cached"] or False,
+                            # Input/Output
+                            "payload": event["payload"],
+                            "result": event["result"],
+                            # Timing Information
+                            "created_at": event["created_at"].isoformat(),
+                            "started_at": (
+                                event["started_at"].isoformat() if event["started_at"] else None
+                            ),
+                            "completed_at": (
+                                event["completed_at"].isoformat()
+                                if event["completed_at"]
+                                else None
+                            ),
+                            "duration": event["duration"],
+                            # Token Usage
+                            "prompt_tokens": event["prompt_tokens"],
+                            "completion_tokens": event["completion_tokens"],
+                            "total_tokens": event["total_tokens"],
+                        }
 
-                if fields:
-                    event_data = {k: v for k, v in event_data.items() if k in fields}
+                        if fields:
+                            event_data = {k: v for k, v in event_data.items() if k in fields}
 
-                if format == "jsonl":
-                    yield json.dumps(event_data) + "\n"
-                elif format == "json":
-                    yield json.dumps(event_data) + ","
+                        if format == "jsonl":
+                            yield json.dumps(event_data) + "\n"
+                        elif format == "json":
+                            yield json.dumps(event_data) + ","
+                    
+                    offset += chunk_size
 
         filename = f"batch_{batch_id}_export.{format}"
         headers = {
@@ -338,6 +349,8 @@ async def export_batch_data(
 
         return StreamingResponse(generate_data(), headers=headers)
 
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions directly
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to export batch data: {str(e)}"

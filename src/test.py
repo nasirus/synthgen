@@ -9,7 +9,8 @@ def transform_to_tasks(dataset, model_name="together_ai/meta-llama/Llama-3.3-70B
     """Transform dataset messages into tasks format"""
     tasks = []
     for item in dataset:
-        for message in item["conversation"]:
+        if item["conversation"]:
+            message = item["conversation"][0]
             task = {
                 "model": model_name,
                 "messages": [

@@ -187,7 +187,6 @@ class MessageConsumer:
                     FROM events 
                     WHERE status = %s 
                     AND payload = %s
-                    ORDER BY created_at ASC 
                     LIMIT 1
                 """,
                     (TaskStatus.COMPLETED.value, json.dumps(payload)),

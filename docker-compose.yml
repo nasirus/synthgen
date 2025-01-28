@@ -1,6 +1,11 @@
 services:
   rabbitmq:
     image: rabbitmq:4.0-management
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
     container_name: rabbitmq
     ports:
       - "5672:5672"   # RabbitMQ default port
@@ -16,6 +21,11 @@ services:
 
   postgres:
     image: postgres:17.2
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1024M
     container_name: postgres
     ports:
       - "5432:5432"
@@ -23,6 +33,8 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=synthetic_data
+      - POSTGRES_MAX_CONNECTIONS=500
+      - POSTGRES_SHARED_BUFFERS=256MB   
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -33,6 +45,11 @@ services:
 
   api:
     build: .
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     container_name: synthetic-data-api
     ports:
       - "8000:8000"
@@ -45,7 +62,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=synthetic_data
       - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
+      - POSTGRES_PORT=5432   
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -63,11 +80,8 @@ services:
       replicas: ${NUM_CONSUMERS:-1}
       resources:
         limits:
-          cpus: '0.25'
+          cpus: '1'
           memory: 512M
-        reservations:
-          cpus: '0.125'
-          memory: 256M
     environment:
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest

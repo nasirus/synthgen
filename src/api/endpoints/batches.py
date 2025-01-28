@@ -75,7 +75,7 @@ class BatchTasksResponse(BaseModel):
     reraise=True,
 )
 @router.get("/batches/{batch_id}", response_model=Batch)
-async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
+async def get_batch(batch_id: str, db: Connection = Depends(get_db)):
     logger.info(f"Fetching status for batch {batch_id}")
     try:
         with db.cursor(row_factory=dict_row) as cur:
@@ -92,13 +92,19 @@ async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
                     SUM(completion_tokens) as completion_tokens,
                     SUM(CASE WHEN status = %s THEN 1 ELSE 0 END) as completed_count,
                     SUM(CASE WHEN status = %s THEN 1 ELSE 0 END) as failed_count,
+                    SUM(CASE WHEN status = %s THEN 1 ELSE 0 END) as processing_count,
                     COUNT(message_id) as total_count,
                     SUM(CASE WHEN cached = TRUE THEN 1 ELSE 0 END) as cached_count
                 FROM events
                 WHERE batch_id = %s
                 GROUP BY batch_id
             """,
-                (TaskStatus.COMPLETED.value, TaskStatus.FAILED.value, batch_id),
+                (
+                    TaskStatus.COMPLETED.value,
+                    TaskStatus.FAILED.value,
+                    TaskStatus.PROCESSING.value,
+                    batch_id,
+                ),
             )
 
             batch_stats = cur.fetchone()
@@ -110,13 +116,24 @@ async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
 
         completed_count = batch_stats["completed_count"]
         failed_count = batch_stats["failed_count"]
+        processing_count = batch_stats["processing_count"]
         total_count = batch_stats["total_count"]
-        pending_count = total_count - (completed_count + failed_count)
+        pending_count = total_count - (
+            completed_count + failed_count + processing_count
+        )
 
         batch_status = (
             TaskStatus.PENDING
             if pending_count > 0
-            else TaskStatus.FAILED if failed_count > 0 else TaskStatus.COMPLETED
+            else (
+                TaskStatus.FAILED
+                if failed_count > 0
+                else (
+                    TaskStatus.PROCESSING
+                    if processing_count > 0
+                    else TaskStatus.COMPLETED
+                )
+            )
         )
 
         response = Batch(
@@ -130,6 +147,7 @@ async def get_bulk_task_status(batch_id: str, db: Connection = Depends(get_db)):
             completed_tasks=completed_count,
             failed_tasks=failed_count,
             pending_tasks=pending_count,
+            processing_tasks=processing_count,
             cached_tasks=batch_stats["cached_count"],
             total_tokens=batch_stats["total_tokens"] or 0,
             prompt_tokens=batch_stats["prompt_tokens"] or 0,
@@ -224,43 +242,91 @@ async def list_batches(
         with db.cursor(row_factory=dict_row) as cur:
             # Get total count of non-null batch_ids
             cur.execute(
-                "SELECT COUNT(DISTINCT batch_id) FROM events WHERE batch_id IS NOT NULL"
+                "SELECT COUNT(DISTINCT batch_id) AS total_batches FROM events WHERE batch_id IS NOT NULL"
             )
-            total_batches = cur.fetchone()["count"]
+            total_batches = cur.fetchone()["total_batches"]
 
-            # Modified query to order by earliest created_at for each batch
+            # Get all batch statistics in a single query
             cur.execute(
                 """
-                SELECT batch_id
-                FROM (
-                    SELECT DISTINCT batch_id, MIN(created_at) AS created_at
-                    FROM events
-                    WHERE batch_id IS NOT NULL
-                    GROUP BY batch_id
-                    ORDER BY MIN(created_at) DESC
-                ) t1
+                SELECT 
+                    e.batch_id,
+                    MIN(e.created_at) as created_at,
+                    MIN(e.started_at) as started_at,
+                    MAX(e.completed_at) as completed_at,
+                    EXTRACT(EPOCH FROM (MAX(e.completed_at) - MIN(e.created_at)))::integer as duration,
+                    SUM(e.total_tokens) as total_tokens,
+                    SUM(e.prompt_tokens) as prompt_tokens,
+                    SUM(e.completion_tokens) as completion_tokens,
+                    SUM(CASE WHEN e.status = %s THEN 1 ELSE 0 END) as completed_count,
+                    SUM(CASE WHEN e.status = %s THEN 1 ELSE 0 END) as failed_count,
+                    SUM(CASE WHEN e.status = %s THEN 1 ELSE 0 END) as processing_count,
+                    COUNT(e.message_id) as total_count,
+                    SUM(CASE WHEN e.cached = TRUE THEN 1 ELSE 0 END) as cached_count
+                FROM events e
+                WHERE e.batch_id IS NOT NULL
+                GROUP BY e.batch_id
+                ORDER BY MIN(e.created_at) DESC
                 LIMIT %s OFFSET %s
-            """,
-                (page_size, offset),
+                """,
+                (
+                    TaskStatus.COMPLETED.value,
+                    TaskStatus.FAILED.value,
+                    TaskStatus.PROCESSING.value,
+                    page_size,
+                    offset,
+                ),
             )
 
-            batch_ids = [row["batch_id"] for row in cur.fetchall()]
+            batch_stats = cur.fetchall()
 
-        # Get status for each batch
         batches = []
-        for batch_id in batch_ids:
-            try:
-                batch_status = await get_bulk_task_status(batch_id, db)
-                batches.append(batch_status)
-            except HTTPException as e:
-                logger.warning(f"Skipping batch {batch_id} due to error: {str(e)}")
-                continue
+        for stats in batch_stats:
+            completed_count = stats["completed_count"]
+            failed_count = stats["failed_count"]
+            processing_count = stats["processing_count"]
+            total_count = stats["total_count"]
+            pending_count = total_count - (completed_count + failed_count + processing_count)
+
+            batch_status = (
+                TaskStatus.PENDING
+                if pending_count > 0
+                else (
+                    TaskStatus.FAILED
+                    if failed_count > 0
+                    else (
+                        TaskStatus.PROCESSING
+                        if processing_count > 0
+                        else TaskStatus.COMPLETED
+                    )
+                )
+            )
+
+            batch = Batch(
+                batch_id=stats["batch_id"],
+                batch_status=batch_status,
+                created_at=stats["created_at"],
+                started_at=stats["started_at"],
+                completed_at=stats["completed_at"],
+                duration=stats["duration"],
+                total_tasks=stats["total_count"],
+                completed_tasks=completed_count,
+                failed_tasks=failed_count,
+                pending_tasks=pending_count,
+                processing_tasks=processing_count,
+                cached_tasks=stats["cached_count"],
+                total_tokens=stats["total_tokens"] or 0,
+                prompt_tokens=stats["prompt_tokens"] or 0,
+                completion_tokens=stats["completion_tokens"] or 0,
+            )
+            batches.append(batch)
 
         return BatchListResponse(
             batches=batches, total=total_batches, page=page, page_size=page_size
         )
 
     except Exception as e:
+        logger.error(f"Failed to fetch batch list: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch batch list: {str(e)}"
         )

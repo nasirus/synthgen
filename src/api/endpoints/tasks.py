@@ -64,7 +64,7 @@ async def submit_task(request: TaskRequest):
     reraise=True,
 )
 @router.get("/tasks/{message_id}", response_model=Task)
-async def get_task_status(message_id: str, db: Connection = Depends(get_db)):
+async def get_task(message_id: str, db: Connection = Depends(get_db)):
     try:
         with db.cursor(row_factory=dict_row) as cur:
             # Get the event details

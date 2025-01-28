@@ -11,6 +11,7 @@ class Batch(BaseModel):
     completed_tasks: int
     failed_tasks: int
     pending_tasks: int
+    processing_tasks: int
     cached_tasks: int
     created_at: datetime
     started_at: Optional[datetime] = None

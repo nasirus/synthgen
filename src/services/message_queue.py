@@ -97,17 +97,6 @@ class RabbitMQHandler:
         }
 
         try:
-            message = Message(
-                body=json.dumps(message_with_metadata).encode(),
-                delivery_mode=DeliveryMode.PERSISTENT,
-                message_id=message_id,
-                headers={"status": TaskStatus.PENDING.value},
-            )
-
-            await self.channel.default_exchange.publish(
-                message, routing_key="data_generation_tasks"
-            )
-
             with pool.connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
@@ -123,36 +112,19 @@ class RabbitMQHandler:
                             json.dumps(normalized_payload),
                         ),
                     )
+
+            message = Message(
+                body=json.dumps(message_with_metadata).encode(),
+                delivery_mode=DeliveryMode.PERSISTENT,
+                message_id=message_id,
+                headers={"status": TaskStatus.PENDING.value},
+            )
+
+            await self.channel.default_exchange.publish(
+                message, routing_key="data_generation_tasks"
+            )
 
             return message_id
 
         except Exception:
-            # If first attempt fails, try one more time
-            await self.connect()
-            message = Message(
-                body=json.dumps(message_with_metadata).encode(),
-                delivery_mode=DeliveryMode.PERSISTENT,
-                message_id=message_id,
-                headers={"status": TaskStatus.PENDING.value},
-            )
-            await self.channel.default_exchange.publish(
-                message, routing_key="data_generation_tasks"
-            )
-
-            with pool.connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        INSERT INTO events (message_id, batch_id, created_at, status, payload)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """,
-                        (
-                            message_id,
-                            batch_id,
-                            timestamp,
-                            TaskStatus.PENDING.value,
-                            json.dumps(normalized_payload),
-                        ),
-                    )
-
-            return message_id
+            raise

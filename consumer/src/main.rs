@@ -2,6 +2,8 @@ use config::{Config, ConfigError, File};
 use consumer::llm_wrapper;
 use consumer::llm_wrapper::Message;
 use serde::Deserialize;
+use chrono::Utc;
+use consumer::db::DatabaseClient;
 
 #[derive(Debug, Deserialize, Clone)]
 struct Settings {
@@ -12,6 +14,7 @@ struct Settings {
     retry_attempts: u32,
     #[serde(default = "default_base_delay_ms")]
     base_delay_ms: u64,
+    database_url: String,
 }
 
 fn default_retry_attempts() -> u32 {
@@ -44,6 +47,16 @@ async fn main() {
         content: "1+1=?".to_string(),
     }];
 
+    let db_client = DatabaseClient::new(&settings.database_url)
+        .await
+        .expect("Failed to connect to database");
+
+    let started_at = Utc::now();
+    let payload = serde_json::json!({
+        "messages": messages,
+        "model": "meta-llama/llama-3.2-1b-instruct"
+    });
+
     let client = llm_wrapper::LLMClient::new();
     let result = llm_wrapper::call_llm(
         &client,
@@ -64,9 +77,26 @@ async fn main() {
             println!("Usage prompt_tokens: {:?}", llm_response.usage.prompt_tokens);
             println!("Usage completion_tokens: {:?}", llm_response.usage.completion_tokens);
             println!("Usage total_tokens: {:?}", llm_response.usage.total_tokens);
+
+            if let Err(e) = db_client.insert_llm_response(
+                None,
+                payload,
+                &llm_response,
+                started_at,
+            ).await {
+                eprintln!("Failed to insert response into database: {:?}", e);
+            }
         }
         Err(e) => {
             eprintln!("Failed after all retry attempts: {:?}", e);
+            if let Err(db_err) = db_client.insert_error(
+                None,
+                payload,
+                &e.to_string(),
+                started_at,
+            ).await {
+                eprintln!("Failed to insert error into database: {:?}", db_err);
+            }
         }
     }
 }

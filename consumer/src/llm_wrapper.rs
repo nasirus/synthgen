@@ -5,6 +5,7 @@ use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
 use std::sync::Arc;
 use http;
+use crate::schemas::llm_response::{LLMResponse, Usage};
 
 #[derive(Serialize, Clone)]
 pub struct Message {
@@ -34,18 +35,6 @@ struct AssistantMessage {
     content: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Usage {
-    pub prompt_tokens: u32,
-    pub completion_tokens: u32,
-    pub total_tokens: u32,
-}
-
-#[derive(Debug)]
-pub struct LLMResponse {
-    pub content: String,
-    pub usage: Usage,
-}
 
 #[derive(Clone)]
 pub struct LLMClient {
@@ -122,6 +111,7 @@ pub async fn call_llm(
         Ok(LLMResponse {
             content: chat_response.choices[0].message.content.clone(),
             usage: chat_response.usage,
+            cached: false,
         })
     })
     .await?;

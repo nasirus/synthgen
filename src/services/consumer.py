@@ -161,11 +161,13 @@ class MessageConsumer:
                         RETURNING id
                     """
                     cur.execute(query, params)
-                    
+
                     # Check if any row was actually updated
                     if cur.rowcount == 0:
                         logger.error(f"No event found with message_id: {message_id}")
-                        raise ValueError(f"Event not found with message_id: {message_id}")
+                        raise ValueError(
+                            f"Event not found with message_id: {message_id}"
+                        )
         except psycopg.errors.UnicodeError as e:
             logger.error(
                 f"Unicode error while updating status for message {message_id}: {str(e)}"

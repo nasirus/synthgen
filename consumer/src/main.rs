@@ -61,6 +61,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let conn = establish_rabbitmq_connection(&settings).await?;
     let channel = conn.create_channel().await?;
     
+    // Set QoS (prefetch) before declaring queue
+    channel.basic_qos(settings.max_parallel_tasks as u16, BasicQosOptions::default())
+        .await?;
+    
     channel.queue_declare(
         "data_generation_tasks",
         QueueDeclareOptions {
@@ -85,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         )
         .await?;
 
-    info!("Started consuming messages...");
+    info!("Started consuming messages with QoS {}", settings.max_parallel_tasks);
     
     while let Some(delivery) = consumer.next().await {
         let delivery = delivery?;

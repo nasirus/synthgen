@@ -59,7 +59,7 @@ pub async fn call_llm(
     site_name: String,
     retry_attempts: u32,
     base_delay_ms: u64,
-) -> Result<LLMResponse, Box<dyn std::error::Error>> {
+) -> Result<LLMResponse, Box<dyn std::error::Error + Send + Sync>> {
     let request = ChatRequest {
         model: model.to_string(),
         messages: messages.to_vec(),

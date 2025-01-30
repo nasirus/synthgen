@@ -5,7 +5,7 @@ def load_wildcat_dataset(split="train", n_samples=100):
     """Load the WildChat dataset"""
     return load_dataset("allenai/WildChat", split=split).select(range(n_samples))
 
-def transform_to_tasks(dataset, model_name="together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"):
+def transform_to_tasks(dataset, model_name, url):
     """Transform dataset messages into tasks format"""
     tasks = []
     for item in dataset:
@@ -13,6 +13,7 @@ def transform_to_tasks(dataset, model_name="together_ai/meta-llama/Llama-3.3-70B
             message = item["conversation"][0]
             task = {
                 "model": model_name,
+                "url": url,
                 "messages": [
                     {
                         "role": "user",
@@ -30,13 +31,14 @@ def write_tasks_to_jsonl(tasks, output_file="tasks.jsonl"):
             f.write(json.dumps(task) + "\n")
 
 if __name__ == "__main__":
-    model_name = "openrouter/meta-llama/llama-3.2-1b-instruct"
-    n_samples = 100
+    model_name = "gpt-4o-mini"
+    url = "https://api.openai.com/v1/chat/completions"
+    n_samples = 10
     # Load dataset
     dataset = load_wildcat_dataset(n_samples=n_samples)
     
     # Transform to tasks
-    tasks = transform_to_tasks(dataset, model_name=model_name)
+    tasks = transform_to_tasks(dataset, model_name=model_name, url=url)
     
     # Write to file
     write_tasks_to_jsonl(tasks, "wildcat_tasks.jsonl")

@@ -27,6 +27,7 @@ class Message(BaseModel):
 
 
 class TaskRequest(BaseModel):
+    url: str = Field(..., description="The URL to be used (e.g., 'https://openrouter.ai/api/v1/chat/completions')")
     model: str = Field(..., description="The model to be used (e.g., 'gpt-4')")
     messages: List[Message] = Field(
         ..., description="List of messages for the conversation"
@@ -44,6 +45,7 @@ class TaskListResponse(BaseModel):
 async def submit_task(request: TaskRequest):
     try:
         task_data = {
+            "url": request.url,
             "model": request.model,
             "messages": [msg.model_dump() for msg in request.messages],
         }

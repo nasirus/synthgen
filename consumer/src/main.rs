@@ -1,14 +1,14 @@
-use config::{Config, ConfigError, File};
-use consumer::llm_wrapper;
-use serde::Deserialize;
 use chrono::Utc;
+use config::{Config, ConfigError, File};
 use consumer::db;
+use consumer::llm_wrapper;
 use consumer::schemas;
-use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
-use tokio::sync::Semaphore;
-use std::sync::Arc;
 use futures_lite::StreamExt;
-use tracing::{info, error};
+use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
+use serde::Deserialize;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
+use tracing::{error, info};
 use tracing_subscriber;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -57,29 +57,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     dotenv::dotenv().ok();
     let settings = Settings::new().expect("Failed to load settings");
-    
+
     let conn = establish_rabbitmq_connection(&settings).await?;
     let channel = conn.create_channel().await?;
-    
+
     // Set QoS (prefetch) before declaring queue
-    channel.basic_qos(settings.max_parallel_tasks as u16, BasicQosOptions::default())
+    channel
+        .basic_qos(
+            settings.max_parallel_tasks as u16,
+            BasicQosOptions::default(),
+        )
         .await?;
-    
-    channel.queue_declare(
-        "data_generation_tasks",
-        QueueDeclareOptions {
-            durable: true,
-            ..QueueDeclareOptions::default()
-        },
-        FieldTable::default(),
-    ).await?;
+
+    channel
+        .queue_declare(
+            "data_generation_tasks",
+            QueueDeclareOptions {
+                durable: true,
+                ..QueueDeclareOptions::default()
+            },
+            FieldTable::default(),
+        )
+        .await?;
 
     let db_client = db::DatabaseClient::new(&settings.database_url)
         .await
         .expect("Failed to connect to database");
-    
+
     let semaphore = Arc::new(Semaphore::new(settings.max_parallel_tasks));
-    
+
     let mut consumer = channel
         .basic_consume(
             "data_generation_tasks",
@@ -89,30 +95,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         )
         .await?;
 
-    info!("Started consuming messages with QoS {}", settings.max_parallel_tasks);
-    
+    info!(
+        "Started consuming messages with QoS {}",
+        settings.max_parallel_tasks
+    );
+
     while let Some(delivery) = consumer.next().await {
         let delivery = delivery?;
         let permit = semaphore.clone().acquire_owned().await?;
         let settings = settings.clone();
         let db_client = db_client.clone();
-        
+
         tokio::spawn(async move {
             process_message(&settings, &db_client, delivery.data.clone()).await;
-            
+
             // Convert error to thread-safe boxed error
-            delivery.ack(BasicAckOptions::default()).await
+            delivery
+                .ack(BasicAckOptions::default())
+                .await
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
             drop(permit);
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
         });
     }
-    
+
     Ok(())
 }
 
-async fn establish_rabbitmq_connection(settings: &Settings) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
+async fn establish_rabbitmq_connection(
+    settings: &Settings,
+) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
     loop {
         let uri = format!(
             "amqp://{}:{}@{}:{}",
@@ -121,7 +134,7 @@ async fn establish_rabbitmq_connection(settings: &Settings) -> Result<Connection
             settings.rabbitmq_host,
             settings.rabbitmq_port
         );
-        
+
         match Connection::connect(&uri, ConnectionProperties::default()).await {
             Ok(conn) => {
                 info!("RabbitMQ connection established");
@@ -143,28 +156,31 @@ async fn process_message(settings: &Settings, db_client: &db::DatabaseClient, da
             return;
         }
     };
-    
+
     let message_id = message_data["message_id"].as_str().unwrap_or_default();
     let payload = message_data["payload"].clone();
     let started_at = Utc::now();
 
     info!("Processing message {}", message_id);
-    
+
     // Update status to PROCESSING
-    if let Err(e) = db_client.update_event_status(
-        message_id.to_string(),
-        schemas::task_status::TaskStatus::Processing,
-        &schemas::llm_response::LLMResponse {
-            content: String::new(),
-            usage: schemas::llm_response::Usage {
-                prompt_tokens: 0,
-                completion_tokens: 0,
-                total_tokens: 0,
+    if let Err(e) = db_client
+        .update_event_status(
+            message_id.to_string(),
+            schemas::task_status::TaskStatus::Processing,
+            &schemas::llm_response::LLMResponse {
+                content: String::new(),
+                usage: schemas::llm_response::Usage {
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    total_tokens: 0,
+                },
+                cached: false,
             },
-            cached: false,
-        },
-        started_at,
-    ).await {
+            started_at,
+        )
+        .await
+    {
         error!("Failed to update status to PROCESSING: {}", e);
         return;
     }
@@ -172,52 +188,72 @@ async fn process_message(settings: &Settings, db_client: &db::DatabaseClient, da
     // Check cache
     if let Ok(Some(cached_response)) = db_client.get_cached_completion(&payload).await {
         info!("Using cached response for message {}", message_id);
-        if let Err(e) = db_client.update_event_status(
-            message_id.to_string(),
-            schemas::task_status::TaskStatus::Completed,
-            &cached_response,
-            started_at,
-        ).await {
+        if let Err(e) = db_client
+            .update_event_status(
+                message_id.to_string(),
+                schemas::task_status::TaskStatus::Completed,
+                &cached_response,
+                started_at,
+            )
+            .await
+        {
             error!("Failed to update cached status: {}", e);
         }
         return;
     }
 
     // Process LLM request
-    let messages = vec![llm_wrapper::Message {
-        role: payload["role"].as_str().unwrap_or_default().to_string(),
-        content: payload["content"].as_str().unwrap_or_default().to_string(),
-    }];
+    let messages: Vec<llm_wrapper::Message> = payload["messages"]
+        .as_array()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .map(|msg| llm_wrapper::Message {
+            role: msg["role"].as_str().unwrap_or_default().to_string(),
+            content: msg["content"].as_str().unwrap_or_default().to_string(),
+        })
+        .collect();
 
+    let model = payload["model"].as_str().unwrap_or_default().to_string();
+    let url = payload["url"].as_str().unwrap_or_default().to_string();
+    
     match llm_wrapper::call_llm(
         &llm_wrapper::LLMClient::new(),
-        "https://openrouter.ai/api/v1/chat/completions",
-        "meta-llama/llama-3.2-1b-instruct",
+        &url,
+        &model,
         &messages,
         settings.openrouter_api_key.clone(),
         settings.site_url.clone(),
         settings.site_name.clone(),
         settings.retry_attempts,
         settings.base_delay_ms,
-    ).await {
+    )
+    .await
+    {
         Ok(response) => {
-            if let Err(e) = db_client.update_event_status(
-                message_id.to_string(),
-                schemas::task_status::TaskStatus::Completed,
-                &response,
-                started_at,
-            ).await {
+            if let Err(e) = db_client
+                .update_event_status(
+                    message_id.to_string(),
+                    schemas::task_status::TaskStatus::Completed,
+                    &response,
+                    started_at,
+                )
+                .await
+            {
                 error!("Failed to update status to COMPLETED: {}", e);
+            } else {
+                let duration = Utc::now().signed_duration_since(started_at);
+                info!(
+                    "Successfully processed message {} in {:?}",
+                    message_id, duration
+                );
             }
         }
         Err(e) => {
             error!("LLM request failed: {}", e);
-            if let Err(db_err) = db_client.insert_error(
-                None,
-                payload,
-                &e.to_string(),
-                started_at,
-            ).await {
+            if let Err(db_err) = db_client
+                .insert_error(None, payload, &e.to_string(), started_at)
+                .await
+            {
                 error!("Failed to insert error: {}", db_err);
             }
         }

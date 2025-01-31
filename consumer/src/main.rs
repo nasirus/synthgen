@@ -56,9 +56,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .init();
 
     dotenv::dotenv().ok();
-    let settings = Settings::new().expect("Failed to load settings");
+    // Wrap settings in an Arc to share them immutably across tasks.
+    let settings = Arc::new(Settings::new().expect("Failed to load settings"));
 
-    let conn = establish_rabbitmq_connection(&settings).await?;
+    // Pass a reference to Settings by dereferencing the Arc.
+    let conn = establish_rabbitmq_connection(&*settings).await?;
     let channel = conn.create_channel().await?;
 
     // Set QoS (prefetch) before declaring queue
@@ -103,11 +105,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     while let Some(delivery) = consumer.next().await {
         let delivery = delivery?;
         let permit = semaphore.clone().acquire_owned().await?;
+        // Clone the Arc pointer; the settings object is only cloned by pointer.
         let settings = settings.clone();
         let db_client = db_client.clone();
 
         tokio::spawn(async move {
-            process_message(&settings, &db_client, delivery.data.clone()).await;
+            process_message(settings, &db_client, delivery.data.clone()).await;
 
             // Convert error to thread-safe boxed error
             delivery
@@ -148,7 +151,7 @@ async fn establish_rabbitmq_connection(
     }
 }
 
-async fn process_message(settings: &Settings, db_client: &db::DatabaseClient, data: Vec<u8>) {
+async fn process_message(settings: Arc<Settings>, db_client: &db::DatabaseClient, data: Vec<u8>) {
     let message_data: serde_json::Value = match serde_json::from_slice(&data) {
         Ok(data) => data,
         Err(e) => {
@@ -215,7 +218,7 @@ async fn process_message(settings: &Settings, db_client: &db::DatabaseClient, da
 
     let model = payload["model"].as_str().unwrap_or_default().to_string();
     let url = payload["url"].as_str().unwrap_or_default().to_string();
-    
+
     match llm_wrapper::call_llm(
         &llm_wrapper::LLMClient::new(),
         &url,

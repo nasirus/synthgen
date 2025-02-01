@@ -4,3 +4,4 @@ pub mod schemas {
     pub mod task_status;
     pub mod llm_response;
 }
+pub mod settings;

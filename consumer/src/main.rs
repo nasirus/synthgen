@@ -9,6 +9,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{error, info};
 use tracing_subscriber;
+use consumer::settings::DatabaseSettings;
 
 #[derive(Debug, Deserialize, Clone)]
 struct Settings {
@@ -19,7 +20,7 @@ struct Settings {
     retry_attempts: u32,
     #[serde(default = "default_base_delay_ms")]
     base_delay_ms: u64,
-    database_url: String,
+    database: DatabaseSettings,
     rabbitmq_host: String,
     rabbitmq_port: u16,
     rabbitmq_user: String,
@@ -83,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Wrap the DatabaseClient in an Arc to share the handle across tasks.
     let db_client = Arc::new(
-        db::DatabaseClient::new(&settings.database_url)
+        db::DatabaseClient::new(&settings.database)
             .await
             .expect("Failed to connect to database"),
     );

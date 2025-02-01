@@ -22,3 +22,5 @@ tokio-postgres = { version = "0.7.12", features = ["with-serde_json-1", "with-ch
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures-lite = "1.13"
+deadpool = "0.12.1"
+deadpool-postgres = "0.14.1"

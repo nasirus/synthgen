@@ -1,47 +1,64 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use tokio_postgres;
 use tokio_postgres::types::Json;
-use tokio_postgres::{Client, Error as PostgresError, NoTls};
 use uuid::Uuid;
-use std::sync::Arc;
+
+use deadpool_postgres::tokio_postgres::NoTls;
+use deadpool_postgres::{Config as PoolConfig, ManagerConfig, Pool, RecyclingMethod};
 
 use crate::schemas::llm_response::{LLMResponse, Usage};
 use crate::schemas::task_status::TaskStatus;
+use crate::settings::DatabaseSettings;
 
 pub struct DatabaseClient {
-    client: Arc<Client>,
+    pool: Pool,
 }
 
 impl DatabaseClient {
-    pub async fn new(connection_string: &str) -> Result<Self, PostgresError> {
-        let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
+    /// Creates a new DatabaseClient with a connection pool from deadpool-postgres.
+    pub async fn new(db_settings: &DatabaseSettings) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let pool_config = PoolConfig {
+            host: Some(db_settings.host.clone()),
+            port: Some(db_settings.port),
+            user: Some(db_settings.user.clone()),
+            password: Some(db_settings.password.clone()),
+            dbname: Some(db_settings.dbname.clone()),
+            pool: Some(deadpool::managed::PoolConfig {
+                max_size: 2,
+                timeouts: deadpool::managed::Timeouts {
+                    wait: Some(std::time::Duration::from_secs(10)),
+                    create: Some(std::time::Duration::from_secs(10)),
+                    recycle: Some(std::time::Duration::from_secs(10)),
+                },
+                ..Default::default()
+            }),
+            manager: Some(ManagerConfig {
+                recycling_method: RecyclingMethod::Fast,
+            }),
+            ..Default::default()
+        };
 
-        // Spawn the connection handler
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("connection error: {}", e);
-            }
-        });
-
-        Ok(DatabaseClient { 
-            client: Arc::new(client) 
-        })
+        let pool = pool_config.create_pool(Some(deadpool_postgres::Runtime::Tokio1), NoTls)?;
+        Ok(DatabaseClient { pool })
     }
 
+    /// Inserts an error event into the database.
     pub async fn insert_error(
         &self,
         batch_id: Option<String>,
         payload: Value,
         error: &str,
         started_at: DateTime<Utc>,
-    ) -> Result<(), PostgresError> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let message_id = Uuid::new_v4().to_string();
         let completed_at = Utc::now();
         let duration = completed_at
             .signed_duration_since(started_at)
             .num_milliseconds() as i32;
 
-        self.client
+        let client = self.pool.get().await?;
+        client
             .execute(
                 "INSERT INTO events (
                 batch_id, message_id, status, payload, result, 
@@ -67,37 +84,39 @@ impl DatabaseClient {
         Ok(())
     }
 
+    /// Updates the event status based on the stage of the request.
     pub async fn update_event_status(
         &self,
         message_id: String,
         status: TaskStatus,
         llm_response: &LLMResponse,
         started_at: DateTime<Utc>,
-    ) -> Result<(), PostgresError> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let completed_at = Utc::now();
         let duration = completed_at
             .signed_duration_since(started_at)
             .num_milliseconds() as i32;
 
+        let client = self.pool.get().await?;
         if status == TaskStatus::Processing {
-            self.client
+            client
                 .execute(
                     "UPDATE events SET started_at = $1, status = $2 WHERE message_id = $3",
                     &[&started_at, &status.as_str(), &message_id],
                 )
                 .await?;
         } else if status == TaskStatus::Completed || status == TaskStatus::Failed {
-            self.client
+            client
                 .execute(
                     "UPDATE events 
                 SET completed_at = $1, 
-                status = $2, 
-                duration = $3, 
-                result = $4, 
-                prompt_tokens = $5, 
-                completion_tokens = $6, 
-                total_tokens = $7,
-                cached = $8
+                    status = $2, 
+                    duration = $3, 
+                    result = $4, 
+                    prompt_tokens = $5, 
+                    completion_tokens = $6, 
+                    total_tokens = $7,
+                    cached = $8
                 WHERE message_id = $9",
                     &[
                         &completed_at,
@@ -119,12 +138,13 @@ impl DatabaseClient {
         Ok(())
     }
 
+    /// Attempts to retrieve a cached LLMResponse from the database based on the payload.
     pub async fn get_cached_completion(
         &self,
         payload: &Value,
-    ) -> Result<Option<LLMResponse>, PostgresError> {
-        let row = self
-            .client
+    ) -> Result<Option<LLMResponse>, Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.pool.get().await?;
+        let row = client
             .query_opt(
                 "SELECT result FROM events WHERE status = $1 AND payload = $2 LIMIT 1",
                 &[&TaskStatus::Completed.as_str(), &Json(payload)],
@@ -158,7 +178,7 @@ impl DatabaseClient {
 impl Clone for DatabaseClient {
     fn clone(&self) -> Self {
         DatabaseClient {
-            client: self.client.clone()
+            pool: self.pool.clone(),
         }
     }
 }

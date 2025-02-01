@@ -13,7 +13,6 @@ use consumer::settings::DatabaseSettings;
 
 #[derive(Debug, Deserialize, Clone)]
 struct Settings {
-    openrouter_api_key: String,
     site_url: String,
     site_name: String,
     #[serde(default = "default_retry_attempts")]
@@ -194,7 +193,7 @@ async fn process_message(
     }
 
     // Check cache
-    if let Ok(Some(cached_response)) = db_client.get_cached_completion(&payload).await {
+    if let Ok(Some(cached_response)) = db_client.get_cached_completion(&payload["body"]).await {
         info!("Using cached response for message {}", message_id);
         if let Err(e) = db_client
             .update_event_status(
@@ -219,26 +218,15 @@ async fn process_message(
         return;
     }
 
-    // Process LLM request
-    let messages: Vec<llm_wrapper::Message> = payload["messages"]
-        .as_array()
-        .unwrap_or(&Vec::new())
-        .iter()
-        .map(|msg| llm_wrapper::Message {
-            role: msg["role"].as_str().unwrap_or_default().to_string(),
-            content: msg["content"].as_str().unwrap_or_default().to_string(),
-        })
-        .collect();
-
-    let model = payload["model"].as_str().unwrap_or_default().to_string();
     let url = payload["url"].as_str().unwrap_or_default().to_string();
+    let body = payload["body"].clone();
+    let api_key = payload["api_key"].as_str().unwrap_or_default().to_string();
 
     match llm_wrapper::call_llm(
         &llm_wrapper::LLMClient::new(),
         &url,
-        &model,
-        &messages,
-        settings.openrouter_api_key.clone(),
+        &body,
+        api_key,
         settings.site_url.clone(),
         settings.site_name.clone(),
         settings.retry_attempts,
@@ -257,6 +245,7 @@ async fn process_message(
                 .await
             {
                 Ok(_) => {
+                    info!("Successfully completed message {} in {}ms", message_id, Utc::now().signed_duration_since(started_at).num_milliseconds());
                     // Acknowledge successful processing
                     if let Err(ack_err) = delivery.ack(BasicAckOptions::default()).await {
                         error!("Failed to acknowledge message: {}", ack_err);

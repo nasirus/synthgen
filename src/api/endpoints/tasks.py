@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List
 from services.message_queue import RabbitMQHandler
 from psycopg import Connection
@@ -14,50 +14,11 @@ router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
 USE_API_PREFIX = True
 
-
-class EventResponse(BaseModel):
-    message_id: str
-
-
-class Message(BaseModel):
-    role: str = Field(
-        ..., description="Role of the message sender (e.g., 'developer', 'user')"
-    )
-    content: str = Field(..., description="Content of the message")
-
-
-class TaskRequest(BaseModel):
-    url: str = Field(..., description="The URL to be used (e.g., 'https://openrouter.ai/api/v1/chat/completions')")
-    model: str = Field(..., description="The model to be used (e.g., 'gpt-4')")
-    messages: List[Message] = Field(
-        ..., description="List of messages for the conversation"
-    )
-
-
 class TaskListResponse(BaseModel):
     total: int
     page: int
     page_size: int
     tasks: List[Task]
-
-
-@router.post("/tasks", response_model=EventResponse)
-async def submit_task(request: TaskRequest):
-    try:
-        task_data = {
-            "url": request.url,
-            "model": request.model,
-            "messages": [msg.model_dump() for msg in request.messages],
-        }
-
-        message_id = await rabbitmq_handler.publish_message(task_data, batch_id=None)
-
-        return EventResponse(message_id=message_id)
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to process request: {str(e)}"
-        )
 
 
 @retry(
@@ -177,9 +138,7 @@ async def list_tasks(
 
         with db.cursor(row_factory=dict_row) as cur:
             # Get total count of individual tasks (where batch_id is NULL)
-            cur.execute(
-                "SELECT COUNT(*) FROM events WHERE batch_id IS NULL"
-            )
+            cur.execute("SELECT COUNT(*) FROM events WHERE batch_id IS NULL")
             total_tasks = cur.fetchone()["count"]
 
             # Get paginated tasks
@@ -227,14 +186,10 @@ async def list_tasks(
             ]
 
             return TaskListResponse(
-                tasks=task_list,
-                total=total_tasks,
-                page=page,
-                page_size=page_size
+                tasks=task_list, total=total_tasks, page=page, page_size=page_size
             )
 
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch task list: {str(e)}"
+            status_code=500, detail=f"Failed to fetch task list: {str(e)}"
         )

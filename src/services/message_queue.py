@@ -27,9 +27,13 @@ class RabbitMQHandler:
                     CREATE TABLE IF NOT EXISTS events (
                         batch_id VARCHAR(255),
                         message_id VARCHAR(255) NOT NULL,
-                        status VARCHAR(50) NOT NULL,
-                        payload JSONB,
+                        custom_id VARCHAR(255) NOT NULL,
+                        method VARCHAR(255) NOT NULL,
+                        url VARCHAR(255) NOT NULL,
+                        api_key VARCHAR(255) NOT NULL,                        
+                        body JSONB,
                         result JSONB,
+                        status VARCHAR(50) NOT NULL,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                         started_at TIMESTAMP WITH TIME ZONE,
                         completed_at TIMESTAMP WITH TIME ZONE,
@@ -37,7 +41,8 @@ class RabbitMQHandler:
                         prompt_tokens INTEGER,
                         completion_tokens INTEGER,
                         total_tokens INTEGER,
-                        cached BOOLEAN DEFAULT FALSE
+                        cached BOOLEAN DEFAULT FALSE,
+                        attempt INTEGER DEFAULT 0
                     )
                 """
                 )
@@ -75,58 +80,6 @@ class RabbitMQHandler:
                 self.channel = await self.connection.channel()
         except Exception:
             await self.connect()
-
-    async def publish_message(
-        self, message: dict[str, Any], batch_id: str = None
-    ) -> str:
-        """
-        Asynchronously publish a single message to RabbitMQ
-        """
-        await self.ensure_connection()
-
-        message_id = str(uuid.uuid4())
-        timestamp = datetime.datetime.now(datetime.UTC)
-        normalized_payload = self.normalize_payload(message)
-
-        message_with_metadata = {
-            "message_id": message_id,
-            "timestamp": timestamp.isoformat(),
-            "payload": normalized_payload,
-            "batch_id": batch_id,
-        }
-
-        try:
-            with pool.connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        INSERT INTO events (message_id, batch_id, created_at, status, payload)
-                        VALUES (%s, %s, %s, %s, %s)
-                        """,
-                        (
-                            message_id,
-                            batch_id,
-                            timestamp,
-                            TaskStatus.PENDING.value,
-                            json.dumps(normalized_payload),
-                        ),
-                    )
-
-            msg = Message(
-                body=json.dumps(message_with_metadata).encode(),
-                delivery_mode=DeliveryMode.PERSISTENT,
-                message_id=message_id,
-                headers={"status": TaskStatus.PENDING.value},
-            )
-
-            await self.channel.default_exchange.publish(
-                msg, routing_key="data_generation_tasks"
-            )
-
-            return message_id
-
-        except Exception:
-            raise
 
     async def publish_bulk_messages(
         self, messages: List[dict[str, Any]]

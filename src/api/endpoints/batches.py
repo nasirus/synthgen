@@ -172,7 +172,7 @@ async def bulk_insert_events(rows_to_copy: list) -> None:
     async with get_async_db() as conn:
         async with conn.cursor() as cur:
             copy_sql = """
-                COPY events (message_id, batch_id, created_at, status, payload)
+                COPY events (message_id, batch_id, created_at, status, custom_id, method, url, api_key, body)
                 FROM STDIN
             """
             async with cur.copy(copy_sql) as copy:
@@ -219,7 +219,11 @@ async def process_bulk_tasks(content: bytes, batch_id: str):
                         batch_id,
                         timestamp,
                         TaskStatus.PENDING.value,
-                        json.dumps(task_data),
+                        task_data["custom_id"],
+                        task_data["method"],
+                        task_data["url"],
+                        task_data["api_key"],
+                        json.dumps(task_data["body"]),
                     ))
                     messages_to_publish.append({
                         "message_id": message_id,

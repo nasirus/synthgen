@@ -143,13 +143,13 @@ impl DatabaseClient {
     /// Attempts to retrieve a cached LLMResponse from the database based on the payload.
     pub async fn get_cached_completion(
         &self,
-        payload: &Value,
+        body: &Value,
     ) -> Result<Option<LLMResponse>, Box<dyn std::error::Error + Send + Sync>> {
         let client = self.pool.get().await?;
         let row = client
             .query_opt(
-                "SELECT result FROM events WHERE status = $1 AND payload = $2 LIMIT 1",
-                &[&TaskStatus::Completed.as_str(), &Json(payload)],
+                "SELECT result FROM events WHERE status = $1 AND body = $2 LIMIT 1",
+                &[&TaskStatus::Completed.as_str(), &Json(body)],
             )
             .await?;
 

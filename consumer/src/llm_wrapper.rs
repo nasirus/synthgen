@@ -2,6 +2,7 @@ use crate::schemas::llm_response::{LLMResponse, Usage};
 use http;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,12 +13,6 @@ use tokio_retry::Retry;
 pub struct Message {
     pub role: String,
     pub content: String,
-}
-
-#[derive(Serialize, Clone)]
-struct ChatRequest {
-    model: String,
-    messages: Vec<Message>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,19 +47,13 @@ impl LLMClient {
 pub async fn call_llm(
     client: &LLMClient,
     url: &str,
-    model: &str,
-    messages: &[Message],
+    body: &Value,
     api_key: String,
     site_url: String,
     site_name: String,
     retry_attempts: u32,
     base_delay_ms: u64,
 ) -> Result<LLMResponse, Box<dyn std::error::Error + Send + Sync>> {
-    let request = ChatRequest {
-        model: model.to_string(),
-        messages: messages.to_vec(),
-    };
-
     let retry_strategy = ExponentialBackoff::from_millis(base_delay_ms)
         .factor(2)
         .max_delay(Duration::from_secs(60))
@@ -86,7 +75,7 @@ pub async fn call_llm(
             .header("Authorization", format!("Bearer {}", api_key))
             .header("HTTP-Referer", &site_url)
             .header("X-Title", &site_name)
-            .json(&request)
+            .json(&body)
             .send()
             .await
             .map_err(|e| {

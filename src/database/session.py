@@ -60,9 +60,6 @@ async def get_async_db():
     try:
         async with async_pool.connection() as conn:
             yield conn
-    except psycopg.errors.PoolTimeout:
-        logger.error("Async connection pool timeout - too many clients")
-        raise
     except Exception as e:
         logger.error(f"Async database error: {str(e)}")
         raise
@@ -72,9 +69,6 @@ def get_db() -> Generator[psycopg.Connection, None, None]:
     try:
         with pool.connection() as conn:
             yield conn
-    except psycopg.errors.PoolTimeout:
-        logger.error("Connection pool timeout - too many clients")
-        raise
     except Exception as e:
         logger.error(f"Database error: {str(e)}")
         raise

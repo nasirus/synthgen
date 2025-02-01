@@ -17,7 +17,9 @@ pub struct DatabaseClient {
 
 impl DatabaseClient {
     /// Creates a new DatabaseClient with a connection pool from deadpool-postgres.
-    pub async fn new(db_settings: &DatabaseSettings) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn new(
+        db_settings: &DatabaseSettings,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let pool_config = PoolConfig {
             host: Some(db_settings.host.clone()),
             port: Some(db_settings.port),

@@ -113,15 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db_client = db_client.clone();
 
         tokio::spawn(async move {
-            // Pass the Arc-wrapped db_client.
-            process_message(settings, db_client, delivery.data.clone()).await;
-
-            // Convert error to thread-safe boxed error
-            delivery
-                .ack(BasicAckOptions::default())
-                .await
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-
+            process_message(settings, db_client, delivery).await;
             drop(permit);
             Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
         });
@@ -158,12 +150,17 @@ async fn establish_rabbitmq_connection(
 async fn process_message(
     settings: Arc<Settings>,
     db_client: Arc<db::DatabaseClient>,
-    data: Vec<u8>,
+    delivery: lapin::message::Delivery,
 ) {
+    let data = delivery.data.clone();
     let message_data: serde_json::Value = match serde_json::from_slice(&data) {
         Ok(data) => data,
         Err(e) => {
             error!("Failed to parse message: {}", e);
+            // Reject the message and don't requeue since it's malformed
+            if let Err(reject_err) = delivery.reject(BasicRejectOptions { requeue: false }).await {
+                error!("Failed to reject malformed message: {}", reject_err);
+            }
             return;
         }
     };
@@ -209,6 +206,15 @@ async fn process_message(
             .await
         {
             error!("Failed to update cached status: {}", e);
+            // Requeue if db update fails
+            if let Err(reject_err) = delivery.reject(BasicRejectOptions { requeue: true }).await {
+                error!("Failed to requeue message: {}", reject_err);
+            }
+            return;
+        }
+        // Acknowledge message for successful cache hit
+        if let Err(ack_err) = delivery.ack(BasicAckOptions::default()).await {
+            error!("Failed to acknowledge message: {}", ack_err);
         }
         return;
     }
@@ -241,7 +247,7 @@ async fn process_message(
     .await
     {
         Ok(response) => {
-            if let Err(e) = db_client
+            match db_client
                 .update_event_status(
                     message_id.to_string(),
                     schemas::task_status::TaskStatus::Completed,
@@ -250,13 +256,19 @@ async fn process_message(
                 )
                 .await
             {
-                error!("Failed to update status to COMPLETED: {}", e);
-            } else {
-                let duration = Utc::now().signed_duration_since(started_at);
-                info!(
-                    "Successfully processed message {} in {:?}",
-                    message_id, duration
-                );
+                Ok(_) => {
+                    // Acknowledge successful processing
+                    if let Err(ack_err) = delivery.ack(BasicAckOptions::default()).await {
+                        error!("Failed to acknowledge message: {}", ack_err);
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to update status to COMPLETED: {}", e);
+                    // Requeue the message if database update fails
+                    if let Err(reject_err) = delivery.reject(BasicRejectOptions { requeue: true }).await {
+                        error!("Failed to requeue message: {}", reject_err);
+                    }
+                }
             }
         }
         Err(e) => {

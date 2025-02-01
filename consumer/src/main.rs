@@ -262,10 +262,23 @@ async fn process_message(
         Err(e) => {
             error!("LLM request failed: {}", e);
             if let Err(db_err) = db_client
-                .insert_error(None, payload, &e.to_string(), started_at)
+                .update_event_status(
+                    message_id.to_string(),
+                    schemas::task_status::TaskStatus::Failed,
+                    &schemas::llm_response::LLMResponse {
+                        content: format!("LLM request failed: {}", e),
+                        usage: schemas::llm_response::Usage {
+                            prompt_tokens: 0,
+                            completion_tokens: 0,
+                            total_tokens: 0,
+                        },
+                        cached: false,
+                    },
+                    started_at,
+                )
                 .await
             {
-                error!("Failed to insert error: {}", db_err);
+                error!("Failed to update status to FAILED: {}", db_err);
             }
         }
     }

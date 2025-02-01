@@ -50,7 +50,7 @@ async def submit_task(request: TaskRequest):
             "messages": [msg.model_dump() for msg in request.messages],
         }
 
-        message_id = await rabbitmq_handler.publish_message(task_data)
+        message_id = await rabbitmq_handler.publish_message(task_data, batch_id=None)
 
         return EventResponse(message_id=message_id)
 

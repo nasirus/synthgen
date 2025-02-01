@@ -2,12 +2,21 @@ from fastapi import FastAPI
 from core.config import settings
 from api import get_all_routers
 import uvicorn
+from contextlib import asynccontextmanager
+from database.session import init_async_pool, close_async_pool
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_async_pool()
+    yield
+    await close_async_pool()
 
 # Create FastAPI app
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="API for generating synthetic data using LLMs",
-    version=settings.VERSION
+    version=settings.VERSION,
+    lifespan=lifespan
 )
 
 # Dynamically include all routers

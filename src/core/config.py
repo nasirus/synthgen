@@ -35,6 +35,9 @@ class Settings:
 
     # LLM timeout
     LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", 300))
+    
+    # Chunk size for bulk inserts
+    CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", 1000))
 
 
 settings = Settings()

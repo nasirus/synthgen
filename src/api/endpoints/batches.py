@@ -13,15 +13,15 @@ from psycopg.rows import dict_row
 from schemas.batch import Batch
 from schemas.task import Task
 from schemas.task_status import TaskStatus
-from database.session import get_db
+from database.session import get_db, get_async_db
 from typing import List
 from services.message_queue import RabbitMQHandler
 import json
 import uuid
-from .tasks import TaskRequest
 from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
 import logging
+import datetime
 
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
@@ -167,36 +167,94 @@ async def get_batch(batch_id: str, db: Connection = Depends(get_db)):
         )
 
 
+async def bulk_insert_events(rows_to_copy: list) -> None:
+    """Helper function to perform bulk insert of events using COPY."""
+    async with get_async_db() as conn:
+        async with conn.cursor() as cur:
+            copy_sql = """
+                COPY events (message_id, batch_id, created_at, status, payload)
+                FROM STDIN
+            """
+            async with cur.copy(copy_sql) as copy:
+                for row in rows_to_copy:
+                    await copy.write_row(row)
+            await conn.commit()
+
 async def process_bulk_tasks(content: bytes, batch_id: str):
+    """
+    Asynchronously process a JSONL file of tasks and perform efficient bulk inserts
+    into PostgreSQL using the COPY protocol, followed by publishing tasks to RabbitMQ
+    in batch.
+    """
     logger.info(f"Processing bulk tasks for batch {batch_id}")
+    
     try:
         lines = content.decode("utf-8").strip().split("\n")
-        logger.info(f"Processing {len(lines)} tasks for batch {batch_id}")
-        for line_number, line in enumerate(lines, 1):
-            try:
-                task_data = json.loads(line)
+        total_lines = len(lines)
+        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+        logger.info(f"Processing {total_lines} tasks for batch {batch_id}")
 
-                if not isinstance(task_data, dict):
-                    raise ValueError(
-                        f"Task data must be a JSON object, got {type(task_data)}"
+        # Process in chunks of 10000
+        CHUNK_SIZE = settings.CHUNK_SIZE
+        for chunk_start in range(0, total_lines, CHUNK_SIZE):
+            chunk_end = min(chunk_start + CHUNK_SIZE, total_lines)
+            current_chunk = lines[chunk_start:chunk_end]
+            
+            # Prepare lists for the current chunk
+            rows_to_copy = []
+            messages_to_publish = []
+            
+            for line_number, line in enumerate(current_chunk, chunk_start + 1):
+                try:
+                    task_data = json.loads(line)
+                    if not isinstance(task_data, dict):
+                        logger.warning(
+                            f"Skipping line {line_number}: Task data must be a JSON object, got {type(task_data)}"
+                        )
+                        continue
+
+                    message_id = str(uuid.uuid4())
+                    rows_to_copy.append((
+                        message_id,
+                        batch_id,
+                        timestamp,
+                        TaskStatus.PENDING.value,
+                        json.dumps(task_data),
+                    ))
+                    messages_to_publish.append({
+                        "message_id": message_id,
+                        "timestamp": timestamp,
+                        "payload": task_data,
+                        "batch_id": batch_id,
+                    })
+                    
+                except json.JSONDecodeError as e:
+                    logger.error(
+                        f"Invalid JSON at line {line_number} in batch {batch_id}: {str(e)}"
                     )
+                except Exception as e:
+                    logger.error(
+                        f"Error processing task at line {line_number} in batch {batch_id}: {str(e)}"
+                    )
+                    continue
 
-                task_request = TaskRequest(**task_data)
-                queue_data = task_request.model_dump()
-                await rabbitmq_handler.publish_message(queue_data, batch_id)
-            except json.JSONDecodeError as e:
-                logger.error(
-                    f"Invalid JSON at line {line_number} in batch {batch_id}: {str(e)}"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error processing task at line {line_number} in batch {batch_id}: {str(e)}"
-                )
-                logger.error(f"Problematic line content: {line}")
-                raise  # Re-raise to see full traceback
+            if not rows_to_copy:
+                logger.warning(f"No valid tasks found in chunk {chunk_start}-{chunk_end} of batch {batch_id}")
+                continue
+
+            # Process the current chunk using the helper function
+            await bulk_insert_events(rows_to_copy)
+            logger.info(f"Successfully inserted chunk {chunk_start}-{chunk_end} ({len(rows_to_copy)} tasks) for batch {batch_id}")
+            
+            # Publish the current chunk to RabbitMQ
+            await rabbitmq_handler.publish_bulk_messages(messages_to_publish)
+            logger.info(f"Successfully published chunk {chunk_start}-{chunk_end} ({len(messages_to_publish)} messages) for batch {batch_id}")
+
+        logger.info(f"Completed processing all chunks for batch {batch_id}")
+
     except Exception as e:
-        logger.error(f"Error processing batch {batch_id}: {str(e)}")
-        raise  # Re-raise to see full traceback
+        logger.error(f"Fatal error processing batch {batch_id}: {str(e)}")
+        raise
 
 
 @router.post("/batches", response_model=BulkTaskResponse)
@@ -286,7 +344,9 @@ async def list_batches(
             failed_count = stats["failed_count"]
             processing_count = stats["processing_count"]
             total_count = stats["total_count"]
-            pending_count = total_count - (completed_count + failed_count + processing_count)
+            pending_count = total_count - (
+                completed_count + failed_count + processing_count
+            )
 
             batch_status = (
                 TaskStatus.PENDING

@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, List
 import uuid
 import datetime
 from dotenv import load_dotenv
@@ -25,7 +25,6 @@ class RabbitMQHandler:
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS events (
-                        id SERIAL PRIMARY KEY,
                         batch_id VARCHAR(255),
                         message_id VARCHAR(255) NOT NULL,
                         status VARCHAR(50) NOT NULL,
@@ -81,7 +80,7 @@ class RabbitMQHandler:
         self, message: dict[str, Any], batch_id: str = None
     ) -> str:
         """
-        Asynchronously publish a message to RabbitMQ
+        Asynchronously publish a single message to RabbitMQ
         """
         await self.ensure_connection()
 
@@ -103,7 +102,7 @@ class RabbitMQHandler:
                         """
                         INSERT INTO events (message_id, batch_id, created_at, status, payload)
                         VALUES (%s, %s, %s, %s, %s)
-                    """,
+                        """,
                         (
                             message_id,
                             batch_id,
@@ -113,7 +112,7 @@ class RabbitMQHandler:
                         ),
                     )
 
-            message = Message(
+            msg = Message(
                 body=json.dumps(message_with_metadata).encode(),
                 delivery_mode=DeliveryMode.PERSISTENT,
                 message_id=message_id,
@@ -121,10 +120,44 @@ class RabbitMQHandler:
             )
 
             await self.channel.default_exchange.publish(
-                message, routing_key="data_generation_tasks"
+                msg, routing_key="data_generation_tasks"
             )
 
             return message_id
+
+        except Exception:
+            raise
+
+    async def publish_bulk_messages(
+        self, messages: List[dict[str, Any]]
+    ) -> List[str]:
+        """
+        Asynchronously publish a batch of messages to RabbitMQ with publisher confirms.
+        Each message is expected to already have keys: "message_id", "timestamp",
+        "payload", and "batch_id".
+        """
+        await self.ensure_connection()
+        published_message_ids = [msg["message_id"] for msg in messages]
+
+        try:
+            # Enable publisher confirms if not already enabled
+            await self.channel.set_qos(prefetch_count=settings.CHUNK_SIZE)
+            
+            # Publish all messages with confirms
+            for message_data in messages:
+                msg = Message(
+                    body=json.dumps(message_data).encode(),
+                    delivery_mode=DeliveryMode.PERSISTENT,
+                    message_id=message_data["message_id"],
+                    headers={"status": TaskStatus.PENDING.value},
+                )
+                await self.channel.default_exchange.publish(
+                    msg,
+                    routing_key="data_generation_tasks",
+                    timeout=30  # Add timeout for publish confirmation
+                )
+            
+            return published_message_ids
 
         except Exception:
             raise

@@ -132,6 +132,7 @@ pub async fn call_llm(
             content: chat_response.choices[0].message.content.clone(),
             usage: chat_response.usage,
             cached: false,
+            attempt: current_attempt,
         })
     })
     .await

@@ -12,4 +12,5 @@ pub struct LLMResponse {
     pub content: String,
     pub usage: Usage,
     pub cached: bool,
+    pub attempt: u32,
 }

@@ -183,6 +183,7 @@ async fn process_message(
                     total_tokens: 0,
                 },
                 cached: false,
+                attempt: 0,
             },
             started_at,
         )
@@ -274,6 +275,7 @@ async fn process_message(
                             total_tokens: 0,
                         },
                         cached: false,
+                        attempt: 0,
                     },
                     started_at,
                 )

@@ -1,7 +1,5 @@
 import json
 from typing import Any, List
-import uuid
-import datetime
 from dotenv import load_dotenv
 from schemas.task_status import TaskStatus
 from database.session import pool

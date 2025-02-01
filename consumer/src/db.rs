@@ -118,8 +118,9 @@ impl DatabaseClient {
                     prompt_tokens = $5, 
                     completion_tokens = $6, 
                     total_tokens = $7,
-                    cached = $8
-                WHERE message_id = $9",
+                    cached = $8,
+                    attempt = $9
+                WHERE message_id = $10",
                     &[
                         &completed_at,
                         &status.as_str(),
@@ -131,6 +132,7 @@ impl DatabaseClient {
                         &(llm_response.usage.completion_tokens as i32),
                         &(llm_response.usage.total_tokens as i32),
                         &llm_response.cached,
+                        &(llm_response.attempt as i32),
                         &message_id,
                     ],
                 )
@@ -168,6 +170,7 @@ impl DatabaseClient {
                     total_tokens: 0,
                 },
                 cached: true,
+                attempt: 0,
             };
 
             Ok(Some(llm_response))

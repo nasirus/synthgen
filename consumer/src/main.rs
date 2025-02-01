@@ -29,10 +29,10 @@ struct Settings {
 }
 
 fn default_retry_attempts() -> u32 {
-    3
+    10
 }
 fn default_base_delay_ms() -> u64 {
-    1000
+    10000
 }
 
 impl Settings {

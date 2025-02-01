@@ -7,7 +7,6 @@ use futures_lite::StreamExt;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::Deserialize;
 use std::sync::Arc;
-use tokio::sync::Semaphore;
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -82,11 +81,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         )
         .await?;
 
-    let db_client = db::DatabaseClient::new(&settings.database_url)
-        .await
-        .expect("Failed to connect to database");
+    // Wrap the DatabaseClient in an Arc to share the handle across tasks.
+    let db_client = Arc::new(
+        db::DatabaseClient::new(&settings.database_url)
+            .await
+            .expect("Failed to connect to database"),
+    );
 
-    let semaphore = Arc::new(Semaphore::new(settings.max_parallel_tasks));
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(settings.max_parallel_tasks));
 
     let mut consumer = channel
         .basic_consume(
@@ -105,12 +107,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     while let Some(delivery) = consumer.next().await {
         let delivery = delivery?;
         let permit = semaphore.clone().acquire_owned().await?;
-        // Clone the Arc pointer; the settings object is only cloned by pointer.
+        // Clone the Arc pointers for settings and db_client.
         let settings = settings.clone();
         let db_client = db_client.clone();
 
         tokio::spawn(async move {
-            process_message(settings, &db_client, delivery.data.clone()).await;
+            // Pass the Arc-wrapped db_client.
+            process_message(settings, db_client, delivery.data.clone()).await;
 
             // Convert error to thread-safe boxed error
             delivery
@@ -151,7 +154,11 @@ async fn establish_rabbitmq_connection(
     }
 }
 
-async fn process_message(settings: Arc<Settings>, db_client: &db::DatabaseClient, data: Vec<u8>) {
+async fn process_message(
+    settings: Arc<Settings>,
+    db_client: Arc<db::DatabaseClient>,
+    data: Vec<u8>,
+) {
     let message_data: serde_json::Value = match serde_json::from_slice(&data) {
         Ok(data) => data,
         Err(e) => {

@@ -42,6 +42,14 @@ class RabbitMQHandler:
                     )
                 """
                 )
+                # Add GIN index for completed events' payload
+                cur.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_events_payload_completed 
+                    ON events USING GIN (payload) 
+                    WHERE status = 'COMPLETED'
+                    """
+                )
 
     def normalize_payload(self, payload):
         if payload is None:

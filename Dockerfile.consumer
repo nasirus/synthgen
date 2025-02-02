@@ -15,10 +15,13 @@ COPY consumer .
 RUN cargo build --release
 
 # Runtime stage
-FROM rust:1.84.1-slim
+FROM debian:stable-20250113-slim
 
-# Create a non-root user
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+# Install SSL libraries and create a non-root user
+RUN apt-get update && \
+    apt-get install -y libssl3 ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -r appgroup && useradd -r -g appgroup appuser
 
 WORKDIR /app
 

@@ -1,42 +1,36 @@
-# Use slim-bullseye as it's more stable and smaller than default slim
-FROM python:3.12-slim-bullseye as builder
+# Build stage
+FROM rust:1.84.1-slim as builder
 
-# Set environment variables to reduce Python bytecode generation and enable unbuffered output
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+# Install build dependencies
+RUN rustup target add x86_64-unknown-linux-musl && \
+    apt update && \
+    apt install -y musl-tools musl-dev pkg-config libssl-dev && \
+    update-ca-certificates
 
-WORKDIR /app
+# Create a new empty shell project
+WORKDIR /usr/src/consumer
+COPY consumer .
 
-# Copy only requirements first to leverage Docker cache
-COPY consumer-requirements.txt .
+# Build for release
+RUN cargo build --release
 
-# Install uv and create virtual environment
-RUN pip install uv --no-cache-dir 
-RUN uv venv /app/venv
-ENV PATH="/app/venv/bin:$PATH"
-RUN uv pip install --no-cache-dir -r consumer-requirements.txt
-RUN rm -rf /root/.cache/pip /root/.cache/uv
+# Runtime stage
+FROM rust:1.84.1-slim
 
-
-# Start a new stage for a smaller final image
-FROM python:3.12-slim-bullseye
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src \
-    PATH="/app/venv/bin:$PATH"
+# Create a non-root user
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
 WORKDIR /app
 
-# Copy only the necessary files from builder
-COPY --from=builder /app/venv /app/venv
-COPY src/ /app/src/
+# Copy the build artifact from builder
+COPY --from=builder /usr/src/consumer/target/release/consumer .
+COPY --from=builder /usr/src/consumer/config ./config
 
-# Create a non-root user for security
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+# Switch to non-root user
 USER appuser
 
-# Use exec form of CMD
-CMD ["python", "src/services/consumer.py"] 
+# Set environment variables
+ENV APP_ENV=production
+
+# Run the binary
+CMD ["./consumer"] 

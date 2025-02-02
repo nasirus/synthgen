@@ -18,6 +18,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - synthetic-data-network
 
   postgres:
     image: postgres:17.2
@@ -42,6 +44,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - synthetic-data-network
 
   api:
     build: .
@@ -70,6 +74,8 @@ services:
         condition: service_healthy
     volumes:
       - ./src:/app/src 
+    networks:
+      - synthetic-data-network
 
   consumer:
     build: 
@@ -102,6 +108,13 @@ services:
       - ./src:/app/src
     env_file:
       - ./src/.env
+    networks:
+      - synthetic-data-network
 
 volumes:
   postgres_data: 
+
+# Add networks configuration at the bottom of the file
+networks:
+  synthetic-data-network:
+    driver: bridge 

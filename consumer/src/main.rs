@@ -139,7 +139,7 @@ async fn establish_rabbitmq_connection(
                 return Ok(conn);
             }
             Err(e) => {
-                error!("Failed to connect to RabbitMQ: {}, retrying in 5s...", e);
+                error!("Failed to connect to RabbitMQ: {} with connection uri: {}, retrying in 5s...", e, uri);
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }

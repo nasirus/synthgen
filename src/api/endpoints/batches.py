@@ -69,6 +69,18 @@ class BatchTasksResponse(BaseModel):
     tasks: List[Task]
 
 
+class TaskSubmission(BaseModel):
+    custom_id: str
+    method: str
+    url: str
+    api_key: str
+    body: dict
+
+
+class TaskListSubmission(BaseModel):
+    tasks: List[TaskSubmission]
+
+
 @retry(
     stop=stop_after_attempt(settings.MAX_RETRIES),
     wait=wait_exponential(multiplier=1, min=4, max=10),
@@ -283,6 +295,31 @@ async def submit_bulk_tasks(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to process bulk request: {str(e)}"
+        )
+
+
+@router.post("/batches/json", response_model=BulkTaskResponse)
+async def submit_json_tasks(
+    background_tasks: BackgroundTasks,
+    tasks: TaskListSubmission
+):
+    logger.info(f"Received JSON task submission with {len(tasks.tasks)} tasks")
+    try:
+        batch_id = str(uuid.uuid4())
+        
+        # Convert tasks to JSONL format
+        content = "\n".join(task.model_dump_json() for task in tasks.tasks).encode("utf-8")
+        rows = len(tasks.tasks)
+
+        # Schedule the message processing in the background
+        background_tasks.add_task(process_bulk_tasks, content, batch_id)
+
+        return BulkTaskResponse(batch_id=batch_id, rows=rows)
+
+    except Exception as e:
+        logger.error(f"Failed to process JSON task submission: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process JSON request: {str(e)}"
         )
 
 

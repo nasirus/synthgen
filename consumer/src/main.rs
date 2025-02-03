@@ -3,13 +3,13 @@ use config::{Config, ConfigError, File};
 use consumer::db;
 use consumer::llm_wrapper;
 use consumer::schemas;
+use consumer::settings::DatabaseSettings;
 use futures_lite::StreamExt;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{error, info};
 use tracing_subscriber;
-use consumer::settings::DatabaseSettings;
 
 #[derive(Debug, Deserialize, Clone)]
 struct Settings {
@@ -55,14 +55,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .init();
 
     dotenv::dotenv().ok();
-    // Wrap settings in an Arc to share them immutably across tasks.
     let settings = Arc::new(Settings::new().expect("Failed to load settings"));
 
-    // Pass a reference to Settings by dereferencing the Arc.
-    let conn = establish_rabbitmq_connection(&*settings).await?;
-    let channel = conn.create_channel().await?;
+    loop {
+        info!("Attempting to establish RabbitMQ connection...");
+        match establish_rabbitmq_connection(&settings).await {
+            Ok(conn) => {
+                info!("RabbitMQ connection established successfully");
+                match conn.create_channel().await {
+                    Ok(channel) => {
+                        info!("RabbitMQ channel created successfully");
+                        if let Err(e) = run_consumer(&settings, &channel).await {
+                            error!("Consumer error: {}. Reconnecting in 5s...", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                            continue;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to create channel: {}. Reconnecting in 5s...", e);
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        continue;
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to connect to RabbitMQ: {}. Retrying in 5s...", e);
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                continue;
+            }
+        }
+    }
+}
 
-    // Set QoS (prefetch) before declaring queue
+async fn run_consumer(
+    settings: &Arc<Settings>,
+    channel: &lapin::Channel,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Set QoS (prefetch)
     channel
         .basic_qos(
             settings.max_parallel_tasks as u16,
@@ -81,7 +110,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         )
         .await?;
 
-    // Wrap the DatabaseClient in an Arc to share the handle across tasks.
     let db_client = Arc::new(
         db::DatabaseClient::new(&settings.database)
             .await
@@ -107,7 +135,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     while let Some(delivery) = consumer.next().await {
         let delivery = delivery?;
         let permit = semaphore.clone().acquire_owned().await?;
-        // Clone the Arc pointers for settings and db_client.
         let settings = settings.clone();
         let db_client = db_client.clone();
 
@@ -139,7 +166,10 @@ async fn establish_rabbitmq_connection(
                 return Ok(conn);
             }
             Err(e) => {
-                error!("Failed to connect to RabbitMQ: {} with connection uri: {}, retrying in 5s...", e, uri);
+                error!(
+                    "Failed to connect to RabbitMQ: {} with connection uri: {}, retrying in 5s...",
+                    e, uri
+                );
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }
@@ -246,7 +276,13 @@ async fn process_message(
                 .await
             {
                 Ok(_) => {
-                    info!("Successfully completed message {} in {}ms", message_id, Utc::now().signed_duration_since(started_at).num_milliseconds());
+                    info!(
+                        "Successfully completed message {} in {}ms",
+                        message_id,
+                        Utc::now()
+                            .signed_duration_since(started_at)
+                            .num_milliseconds()
+                    );
                     // Acknowledge successful processing
                     if let Err(ack_err) = delivery.ack(BasicAckOptions::default()).await {
                         error!("Failed to acknowledge message: {}", ack_err);
@@ -255,7 +291,9 @@ async fn process_message(
                 Err(e) => {
                     error!("Failed to update status to COMPLETED: {}", e);
                     // Requeue the message if database update fails
-                    if let Err(reject_err) = delivery.reject(BasicRejectOptions { requeue: true }).await {
+                    if let Err(reject_err) =
+                        delivery.reject(BasicRejectOptions { requeue: true }).await
+                    {
                         error!("Failed to requeue message: {}", reject_err);
                     }
                 }

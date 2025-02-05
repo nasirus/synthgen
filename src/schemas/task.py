@@ -8,7 +8,7 @@ class Task(BaseModel):
     message_id: str
     batch_id: Optional[str]
     status: TaskStatus
-    payload: Optional[dict]
+    body: Optional[dict]
     result: Optional[dict]
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
@@ -19,6 +19,8 @@ class Task(BaseModel):
     completed_at: Optional[datetime]
     duration: Optional[int]
     queue_position: Optional[int]
+    dataset: Optional[str]
+    source: Optional[dict]
 
     class Config:
         from_attributes = True

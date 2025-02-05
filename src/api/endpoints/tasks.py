@@ -68,7 +68,7 @@ async def get_task(message_id: str, db: Connection = Depends(get_db)):
                 message_id=event["message_id"],
                 batch_id=event["batch_id"],
                 status=event["status"],
-                payload=event["payload"],
+                body=event["body"],
                 result=event["result"],
                 prompt_tokens=event["prompt_tokens"],
                 completion_tokens=event["completion_tokens"],
@@ -79,6 +79,8 @@ async def get_task(message_id: str, db: Connection = Depends(get_db)):
                 completed_at=event["completed_at"] if event["completed_at"] else None,
                 duration=event["duration"],
                 queue_position=queue_position,
+                dataset=event["dataset"],
+                source=event["source"],
             )
 
             return response

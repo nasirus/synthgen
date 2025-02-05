@@ -4,8 +4,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: 256M
+          cpus: '0.5'
+          memory: 1024M
     container_name: rabbitmq
     ports:
       - "5672:5672"   # RabbitMQ default port
@@ -26,8 +26,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 1024M
+          cpus: '4'
+          memory: 4096M
     container_name: postgres
     ports:
       - "5432:5432"
@@ -35,8 +35,8 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=synthetic_data
-      - POSTGRES_MAX_CONNECTIONS=500
-      - POSTGRES_SHARED_BUFFERS=256MB   
+      - POSTGRES_MAX_CONNECTIONS=1000
+      - POSTGRES_SHARED_BUFFERS=1024MB   
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -52,11 +52,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '1'
+          memory: 2048M
     container_name: synthetic-data-api
     ports:
-      - "8000:8000"
+      - "8002:8000"
     environment:
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest
@@ -87,7 +87,7 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 512M
+          memory: 1024M
     environment:
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest

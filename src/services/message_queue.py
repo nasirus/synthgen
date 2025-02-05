@@ -27,8 +27,7 @@ class RabbitMQHandler:
                         message_id VARCHAR(255) NOT NULL,
                         custom_id VARCHAR(255) NOT NULL,
                         method VARCHAR(255) NOT NULL,
-                        url VARCHAR(255) NOT NULL,
-                        api_key VARCHAR(255) NOT NULL,                        
+                        url VARCHAR(255) NOT NULL,                       
                         body JSONB,
                         result JSONB,
                         status VARCHAR(50) NOT NULL,
@@ -40,7 +39,9 @@ class RabbitMQHandler:
                         completion_tokens INTEGER,
                         total_tokens INTEGER,
                         cached BOOLEAN DEFAULT FALSE,
-                        attempt INTEGER DEFAULT 0
+                        attempt INTEGER DEFAULT 0,
+                        dataset VARCHAR(255),
+                        source JSONB
                     )
                 """
                 )

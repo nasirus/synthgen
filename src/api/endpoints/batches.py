@@ -14,7 +14,7 @@ from schemas.batch import Batch
 from schemas.task import Task
 from schemas.task_status import TaskStatus
 from database.session import get_db, get_async_db
-from typing import List
+from typing import Any, Dict, List, Optional
 from services.message_queue import RabbitMQHandler
 import json
 import uuid
@@ -75,6 +75,8 @@ class TaskSubmission(BaseModel):
     url: str
     api_key: str
     body: dict
+    dataset: Optional[str] = None
+    source: Optional[Dict[str, Any]] = None
 
 
 class TaskListSubmission(BaseModel):
@@ -184,7 +186,7 @@ async def bulk_insert_events(rows_to_copy: list) -> None:
     async with get_async_db() as conn:
         async with conn.cursor() as cur:
             copy_sql = """
-                COPY events (message_id, batch_id, created_at, status, custom_id, method, url, api_key, body)
+                COPY events (message_id, batch_id, created_at, status, custom_id, method, url, body, dataset, source)
                 FROM STDIN
             """
             async with cur.copy(copy_sql) as copy:
@@ -234,8 +236,9 @@ async def process_bulk_tasks(content: bytes, batch_id: str):
                         task_data["custom_id"],
                         task_data["method"],
                         task_data["url"],
-                        task_data["api_key"],
                         json.dumps(task_data["body"]),
+                        task_data.get("dataset", None),
+                        json.dumps(task_data.get("source", None)),
                     ))
                     messages_to_publish.append({
                         "message_id": message_id,
@@ -481,7 +484,7 @@ async def get_batch_tasks(
                 batch_id=task["batch_id"],
                 status=TaskStatus(task["status"]),
                 cached=task["cached"] or False,
-                payload=task["payload"],
+                body=task["body"],
                 result=task["result"],
                 created_at=task["created_at"],
                 started_at=task["started_at"],
@@ -491,6 +494,8 @@ async def get_batch_tasks(
                 prompt_tokens=task["prompt_tokens"],
                 completion_tokens=task["completion_tokens"],
                 queue_position=None,
+                dataset=task["dataset"],
+                source=task["source"],
             )
             for task in tasks
         ]

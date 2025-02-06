@@ -16,6 +16,7 @@ from schemas.task_status import TaskStatus
 from database.session import get_db, get_async_db
 from typing import Any, Dict, List, Optional
 from services.message_queue import RabbitMQHandler
+from services.storage import StorageHandler
 import json
 import uuid
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -25,6 +26,7 @@ import datetime
 
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
+storage_handler = StorageHandler()
 USE_API_PREFIX = True
 
 # Create a logger instance at module level
@@ -52,8 +54,6 @@ setup_logging()
 
 class BulkTaskResponse(BaseModel):
     batch_id: str
-    rows: int
-
 
 class BatchListResponse(BaseModel):
     total: int
@@ -194,6 +194,7 @@ async def bulk_insert_events(rows_to_copy: list) -> None:
                     await copy.write_row(row)
             await conn.commit()
 
+
 async def process_bulk_tasks(content: bytes, batch_id: str):
     """
     Asynchronously process a JSONL file of tasks and perform efficient bulk inserts
@@ -201,7 +202,7 @@ async def process_bulk_tasks(content: bytes, batch_id: str):
     in batch.
     """
     logger.info(f"Processing bulk tasks for batch {batch_id}")
-    
+
     try:
         lines = content.decode("utf-8").strip().split("\n")
         total_lines = len(lines)
@@ -213,11 +214,11 @@ async def process_bulk_tasks(content: bytes, batch_id: str):
         for chunk_start in range(0, total_lines, CHUNK_SIZE):
             chunk_end = min(chunk_start + CHUNK_SIZE, total_lines)
             current_chunk = lines[chunk_start:chunk_end]
-            
+
             # Prepare lists for the current chunk
             rows_to_copy = []
             messages_to_publish = []
-            
+
             for line_number, line in enumerate(current_chunk, chunk_start + 1):
                 try:
                     task_data = json.loads(line)
@@ -228,25 +229,29 @@ async def process_bulk_tasks(content: bytes, batch_id: str):
                         continue
 
                     message_id = str(uuid.uuid4())
-                    rows_to_copy.append((
-                        message_id,
-                        batch_id,
-                        timestamp,
-                        TaskStatus.PENDING.value,
-                        task_data["custom_id"],
-                        task_data["method"],
-                        task_data["url"],
-                        json.dumps(task_data["body"]),
-                        task_data.get("dataset", None),
-                        json.dumps(task_data.get("source", None)),
-                    ))
-                    messages_to_publish.append({
-                        "message_id": message_id,
-                        "timestamp": timestamp,
-                        "payload": task_data,
-                        "batch_id": batch_id,
-                    })
-                    
+                    rows_to_copy.append(
+                        (
+                            message_id,
+                            batch_id,
+                            timestamp,
+                            TaskStatus.PENDING.value,
+                            task_data["custom_id"],
+                            task_data["method"],
+                            task_data["url"],
+                            json.dumps(task_data["body"]),
+                            task_data.get("dataset", None),
+                            json.dumps(task_data.get("source", None)),
+                        )
+                    )
+                    messages_to_publish.append(
+                        {
+                            "message_id": message_id,
+                            "timestamp": timestamp,
+                            "payload": task_data,
+                            "batch_id": batch_id,
+                        }
+                    )
+
                 except json.JSONDecodeError as e:
                     logger.error(
                         f"Invalid JSON at line {line_number} in batch {batch_id}: {str(e)}"
@@ -258,16 +263,22 @@ async def process_bulk_tasks(content: bytes, batch_id: str):
                     continue
 
             if not rows_to_copy:
-                logger.warning(f"No valid tasks found in chunk {chunk_start}-{chunk_end} of batch {batch_id}")
+                logger.warning(
+                    f"No valid tasks found in chunk {chunk_start}-{chunk_end} of batch {batch_id}"
+                )
                 continue
 
             # Process the current chunk using the helper function
             await bulk_insert_events(rows_to_copy)
-            logger.info(f"Successfully inserted chunk {chunk_start}-{chunk_end} ({len(rows_to_copy)} tasks) for batch {batch_id}")
-            
+            logger.info(
+                f"Successfully inserted chunk {chunk_start}-{chunk_end} ({len(rows_to_copy)} tasks) for batch {batch_id}"
+            )
+
             # Publish the current chunk to RabbitMQ
             await rabbitmq_handler.publish_bulk_messages(messages_to_publish)
-            logger.info(f"Successfully published chunk {chunk_start}-{chunk_end} ({len(messages_to_publish)} messages) for batch {batch_id}")
+            logger.info(
+                f"Successfully published chunk {chunk_start}-{chunk_end} ({len(messages_to_publish)} messages) for batch {batch_id}"
+            )
 
         logger.info(f"Completed processing all chunks for batch {batch_id}")
 
@@ -278,24 +289,29 @@ async def process_bulk_tasks(content: bytes, batch_id: str):
 
 @router.post("/batches", response_model=BulkTaskResponse)
 async def submit_bulk_tasks(
-    background_tasks: BackgroundTasks, file: UploadFile = File(...)
+    file: UploadFile = File(...), batch_id: Optional[str] = Query(default=None)
 ):
     logger.info(f"Received bulk task submission: {file.filename}")
     if not file.filename.endswith(".jsonl"):
         raise HTTPException(status_code=400, detail="Only JSONL files are supported")
 
     try:
-        batch_id = str(uuid.uuid4())
+        batch_id = batch_id or str(uuid.uuid4())
         content = await file.read()
-        lines = content.decode("utf-8").strip().split("\n")
-        rows = len(lines)
 
-        # Schedule the message processing in the background
-        background_tasks.add_task(process_bulk_tasks, content, batch_id)
+        # Upload file to MinIO
+        object_name = f"batches/{batch_id}/{file.filename}"
+        await storage_handler.upload_file(
+            bucket_name=settings.S3_BUCKET_NAME,
+            object_name=object_name,
+            file_data=content,
+        )
+        logger.info(f"Uploaded file to MinIO: {object_name}")
 
-        return BulkTaskResponse(batch_id=batch_id, rows=rows)
+        return BulkTaskResponse(batch_id=batch_id)
 
     except Exception as e:
+        logger.error(f"Failed to process bulk request: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to process bulk request: {str(e)}"
         )
@@ -303,21 +319,21 @@ async def submit_bulk_tasks(
 
 @router.post("/batches/json", response_model=BulkTaskResponse)
 async def submit_json_tasks(
-    background_tasks: BackgroundTasks,
-    tasks: TaskListSubmission
+    background_tasks: BackgroundTasks, tasks: TaskListSubmission
 ):
     logger.info(f"Received JSON task submission with {len(tasks.tasks)} tasks")
     try:
         batch_id = str(uuid.uuid4())
-        
+
         # Convert tasks to JSONL format
-        content = "\n".join(task.model_dump_json() for task in tasks.tasks).encode("utf-8")
-        rows = len(tasks.tasks)
+        content = "\n".join(task.model_dump_json() for task in tasks.tasks).encode(
+            "utf-8"
+        )
 
         # Schedule the message processing in the background
         background_tasks.add_task(process_bulk_tasks, content, batch_id)
 
-        return BulkTaskResponse(batch_id=batch_id, rows=rows)
+        return BulkTaskResponse(batch_id=batch_id)
 
     except Exception as e:
         logger.error(f"Failed to process JSON task submission: {str(e)}")

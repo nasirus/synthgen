@@ -72,13 +72,15 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     volumes:
       - ./src:/app/src 
     networks:
       - synthetic-data-network
 
   consumer:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.consumer
     deploy:
@@ -111,8 +113,34 @@ services:
     networks:
       - synthetic-data-network
 
+  minio:
+    image: quay.io/minio/minio:latest
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1024M
+    container_name: minio
+    ports:
+      - "9000:9000"   # API port
+      - "9001:9001"   # Console port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - synthetic-data-network
+
 volumes:
-  postgres_data: 
+  postgres_data:
+  minio_data:
 
 # Add networks configuration at the bottom of the file
 networks:

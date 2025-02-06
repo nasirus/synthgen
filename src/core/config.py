@@ -35,9 +35,15 @@ class Settings:
 
     # LLM timeout
     LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", 300))
-    
+
     # Chunk size for bulk inserts
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", 1000))
+
+    # S3 Settings
+    S3_ENDPOINT: str = os.getenv("S3_ENDPOINT", "http://minio:9000")
+    S3_ACCESS_KEY: str = os.getenv("S3_ACCESS_KEY", "minioadmin")
+    S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "minioadmin")
+    S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "synthetic-data-generator")
 
 
 settings = Settings()

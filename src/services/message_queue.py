@@ -5,16 +5,25 @@ from schemas.task_status import TaskStatus
 from database.session import pool
 from aio_pika import connect_robust, Message, DeliveryMode
 from core.config import settings
+import logging
 
+# Create a logger instance at module level
+logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
 
+
 class RabbitMQHandler:
-    def __init__(self):
-        self.connection = None
-        self.channel = None
-        self._initialize()
+    _instance = None  # Class variable to hold the single instance
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(RabbitMQHandler, cls).__new__(cls)
+            cls._instance.connection = None
+            cls._instance.channel = None
+            cls._instance._initialize()  # Call _initialize only once
+        return cls._instance
 
     def _initialize(self):
         # Initialize database by ensuring the events table exists
@@ -45,6 +54,28 @@ class RabbitMQHandler:
                     )
                 """
                 )
+        # Initialize queues
+        self.connect_sync()
+
+    def connect_sync(self):
+        """Establish sync connection to RabbitMQ to declare queues"""
+        import pika
+
+        parameters = pika.ConnectionParameters(
+            host=settings.RABBITMQ_HOST,
+            port=settings.RABBITMQ_PORT,
+            credentials=pika.PlainCredentials(
+                settings.RABBITMQ_USER, settings.RABBITMQ_PASS
+            ),
+        )
+        connection = pika.BlockingConnection(parameters)
+        channel = connection.channel()
+        channel.queue_declare(queue="data_generation_tasks", durable=True)
+        logger.info("Declared data_generation_tasks queue")
+        channel.queue_declare(queue="data_generation_batch", durable=True)
+        logger.info("Declared data_generation_batch queue")
+        connection.close()
+
 
     def normalize_payload(self, payload):
         if payload is None:
@@ -68,7 +99,6 @@ class RabbitMQHandler:
                 password=settings.RABBITMQ_PASS,
             )
             self.channel = await self.connection.channel()
-            await self.channel.declare_queue("data_generation_tasks", durable=True)
 
     async def ensure_connection(self):
         """Ensure that async connection and channel are available"""
@@ -80,9 +110,7 @@ class RabbitMQHandler:
         except Exception:
             await self.connect()
 
-    async def publish_bulk_messages(
-        self, messages: List[dict[str, Any]]
-    ) -> List[str]:
+    async def publish_bulk_messages(self, messages: List[dict[str, Any]]) -> List[str]:
         """
         Asynchronously publish a batch of messages to RabbitMQ with publisher confirms.
         Each message is expected to already have keys: "message_id", "timestamp",
@@ -94,7 +122,7 @@ class RabbitMQHandler:
         try:
             # Enable publisher confirms if not already enabled
             await self.channel.set_qos(prefetch_count=settings.CHUNK_SIZE)
-            
+
             # Publish all messages with confirms
             for message_data in messages:
                 msg = Message(
@@ -106,10 +134,30 @@ class RabbitMQHandler:
                 await self.channel.default_exchange.publish(
                     msg,
                     routing_key="data_generation_tasks",
-                    timeout=30  # Add timeout for publish confirmation
+                    timeout=30,  # Add timeout for publish confirmation
                 )
-            
+
             return published_message_ids
 
+        except Exception:
+            raise
+
+    async def publish_message(self, message: dict[str, Any]):
+        """
+        Publish a single message to the RabbitMQ queue.  This is used for
+        the file upload metadata.
+        """
+        await self.ensure_connection()
+        logger.info(f"Publishing message to RabbitMQ: {message}")
+        try:
+            msg = Message(
+                body=json.dumps(message).encode(),
+                delivery_mode=DeliveryMode.PERSISTENT,
+            )
+            await self.channel.default_exchange.publish(
+                msg,
+                routing_key="data_generation_batch",
+                timeout=30,
+            )
         except Exception:
             raise

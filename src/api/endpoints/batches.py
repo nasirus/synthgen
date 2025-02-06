@@ -55,6 +55,7 @@ setup_logging()
 class BulkTaskResponse(BaseModel):
     batch_id: str
 
+
 class BatchListResponse(BaseModel):
     total: int
     page: int
@@ -307,6 +308,17 @@ async def submit_bulk_tasks(
             file_data=content,
         )
         logger.info(f"Uploaded file to MinIO: {object_name}")
+
+        # Send message to RabbitMQ
+        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+        message = {
+            "batch_id": batch_id,
+            "object_name": object_name,
+            "upload_timestamp": timestamp,
+            "bucket_name": settings.S3_BUCKET_NAME,
+        }
+        await rabbitmq_handler.publish_message(message)
+        logger.info(f"Sent metadata message to RabbitMQ for batch {batch_id}")
 
         return BulkTaskResponse(batch_id=batch_id)
 

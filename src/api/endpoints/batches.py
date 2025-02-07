@@ -10,11 +10,12 @@ from fastapi import (
 from pydantic import BaseModel
 from psycopg import Connection
 from psycopg.rows import dict_row
+from database.session import get_async_db
 from schemas.batch import Batch
 from schemas.task import Task
 from schemas.task_status import TaskStatus
-from database.session import get_db, get_async_db
 from typing import Any, Dict, List, Optional
+from services.database import bulk_insert_events
 from services.message_queue import RabbitMQHandler
 from services.storage import StorageHandler
 import json
@@ -90,7 +91,7 @@ class TaskListSubmission(BaseModel):
     reraise=True,
 )
 @router.get("/batches/{batch_id}", response_model=Batch)
-async def get_batch(batch_id: str, db: Connection = Depends(get_db)):
+async def get_batch(batch_id: str, db: Connection = Depends(get_async_db)):
     logger.info(f"Fetching status for batch {batch_id}")
     try:
         with db.cursor(row_factory=dict_row) as cur:
@@ -180,21 +181,6 @@ async def get_batch(batch_id: str, db: Connection = Depends(get_db)):
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch bulk task status: {str(e)}"
         )
-
-
-async def bulk_insert_events(rows_to_copy: list) -> None:
-    """Helper function to perform bulk insert of events using COPY."""
-    async with get_async_db() as conn:
-        async with conn.cursor() as cur:
-            copy_sql = """
-                COPY events (message_id, batch_id, created_at, status, custom_id, method, url, body, dataset, source)
-                FROM STDIN
-            """
-            async with cur.copy(copy_sql) as copy:
-                for row in rows_to_copy:
-                    await copy.write_row(row)
-            await conn.commit()
-
 
 async def process_bulk_tasks(content: bytes, batch_id: str):
     """
@@ -363,7 +349,7 @@ async def submit_json_tasks(
 async def list_batches(
     page: int = Query(1, gt=0),
     page_size: int = Query(50, gt=0, le=100),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_async_db),
 ):
     logger.info(f"Listing batches - page: {page}, page_size: {page_size}")
     try:
@@ -474,7 +460,7 @@ async def get_batch_tasks(
     batch_id: str,
     page: int = Query(1, gt=0),
     page_size: int = Query(50, gt=0, le=100),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_async_db),
 ):
     logger.info(
         f"Fetching tasks for batch {batch_id} - page: {page}, page_size: {page_size}"
@@ -546,7 +532,7 @@ async def get_batch_tasks(
     reraise=True,
 )
 @router.delete("/batches/{batch_id}", status_code=204)
-async def delete_batch(batch_id: str, db: Connection = Depends(get_db)):
+async def delete_batch(batch_id: str, db: Connection = Depends(get_async_db)):
     logger.info(f"Deleting batch {batch_id}")
     try:
         with db.cursor(row_factory=dict_row) as cur:

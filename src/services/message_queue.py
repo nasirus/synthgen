@@ -6,6 +6,7 @@ from database.session import pool
 from aio_pika import connect_robust, Message, DeliveryMode
 from core.config import settings
 import logging
+import aio_pika
 
 # Create a logger instance at module level
 logger = logging.getLogger(__name__)
@@ -108,7 +109,7 @@ class RabbitMQHandler:
         except Exception:
             await self.connect()
 
-    async def publish_bulk_messages(self, messages: List[dict[str, Any]]) -> List[str]:
+    async def publish_bulk_messages(self, messages: List[dict[str, Any]], queue_name: str) -> List[str]:
         """
         Asynchronously publish a batch of messages to RabbitMQ with publisher confirms.
         Each message is expected to already have keys: "message_id", "timestamp",
@@ -131,9 +132,10 @@ class RabbitMQHandler:
                 )
                 await self.channel.default_exchange.publish(
                     msg,
-                    routing_key="data_generation_tasks",
+                    routing_key=queue_name,
                     timeout=30,  # Add timeout for publish confirmation
                 )
+
 
             return published_message_ids
 
@@ -161,3 +163,36 @@ class RabbitMQHandler:
 
         except Exception:
             raise
+
+    async def consume_messages(self, queue_name: str, callback):
+        """
+        Consumes messages from the specified queue and processes them using the callback.
+
+        Args:
+            queue_name (str): Name of the queue to consume from
+            callback (callable): Async callback function to process the message
+        """
+        if not self.connection or self.connection.is_closed:
+            self.connection = await aio_pika.connect_robust(
+                host=settings.RABBITMQ_HOST,
+                port=settings.RABBITMQ_PORT,
+                login=settings.RABBITMQ_USER,
+                password=settings.RABBITMQ_PASS,
+                timeout=30,
+            )
+
+        if not self.channel or self.channel.is_closed:
+            self.channel = await self.connection.channel()
+            await self.channel.set_qos(prefetch_count=1)
+
+        # Declare the queue
+        queue = await self.channel.declare_queue(queue_name, durable=True)
+
+        async with queue.iterator() as queue_iter:
+            async for message in queue_iter:
+                try:
+                    async with message.process():
+                        await callback(message.body)
+                except Exception as e:
+                    self.logger.error(f"Error processing message: {str(e)}")
+                    # Optionally implement dead letter queue handling here

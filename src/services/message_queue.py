@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
-
 class RabbitMQHandler:
     _instance = None  # Class variable to hold the single instance
 
@@ -75,7 +74,6 @@ class RabbitMQHandler:
         channel.queue_declare(queue="data_generation_batch", durable=True)
         logger.info("Declared data_generation_batch queue")
         connection.close()
-
 
     def normalize_payload(self, payload):
         if payload is None:
@@ -142,13 +140,14 @@ class RabbitMQHandler:
         except Exception:
             raise
 
-    async def publish_message(self, message: dict[str, Any]):
+    async def publish_message(self, message: dict[str, Any], routing_key: str):
         """
         Publish a single message to the RabbitMQ queue.  This is used for
         the file upload metadata.
         """
         await self.ensure_connection()
         logger.info(f"Publishing message to RabbitMQ: {message}")
+
         try:
             msg = Message(
                 body=json.dumps(message).encode(),
@@ -156,8 +155,9 @@ class RabbitMQHandler:
             )
             await self.channel.default_exchange.publish(
                 msg,
-                routing_key="data_generation_batch",
+                routing_key=routing_key,
                 timeout=30,
             )
+
         except Exception:
             raise

@@ -317,7 +317,7 @@ async def submit_bulk_tasks(
             "upload_timestamp": timestamp,
             "bucket_name": settings.S3_BUCKET_NAME,
         }
-        await rabbitmq_handler.publish_message(message)
+        await rabbitmq_handler.publish_message(message, "data_generation_batch")
         logger.info(f"Sent metadata message to RabbitMQ for batch {batch_id}")
 
         return BulkTaskResponse(batch_id=batch_id)

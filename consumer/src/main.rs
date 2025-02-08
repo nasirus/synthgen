@@ -9,7 +9,7 @@ use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{error, info};
-use tracing_subscriber;
+use tracing_subscriber::{fmt, EnvFilter};
 
 #[derive(Debug, Deserialize, Clone)]
 struct Settings {
@@ -47,12 +47,21 @@ impl Settings {
     }
 }
 
+fn init_logging() {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env()
+            .add_directive(tracing::Level::DEBUG.into()))  // Set default level to DEBUG
+        .with_target(true)  // Include the target (module path) in the log output
+        .with_thread_ids(true)  // Include thread IDs
+        .with_line_number(true)  // Include line numbers
+        .with_file(true)  // Include file names
+        .init();  // Initialize the subscriber
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Initialize tracing subscriber
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .init();
+    // Initialize logging first
+    init_logging();
 
     dotenv::dotenv().ok();
     let settings = Arc::new(Settings::new().expect("Failed to load settings"));
@@ -320,6 +329,10 @@ async fn process_message(
                 .await
             {
                 error!("Failed to update status to FAILED: {}", db_err);
+            }
+            // Add acknowledgment for failed LLM requests
+            if let Err(ack_err) = delivery.ack(BasicAckOptions::default()).await {
+                error!("Failed to acknowledge failed message: {}", ack_err);
             }
         }
     }

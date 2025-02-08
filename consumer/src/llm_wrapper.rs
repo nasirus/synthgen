@@ -94,7 +94,7 @@ pub async fn call_llm(
                     e
                 );
                 if e.is_timeout() || e.is_connect() {
-                    std::thread::sleep(Duration::from_millis(100));
+                    std::thread::sleep(Duration::from_millis(base_delay_ms));
                 }
                 e
             })?;

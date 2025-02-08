@@ -9,10 +9,9 @@ from core.config import settings
 from schemas.task_status import TaskStatus
 from services.message_queue import RabbitMQHandler
 from services.storage import StorageHandler
+from services.database import bulk_insert_events
 from pydantic import BaseModel, ValidationError
 from typing import Any, Dict, Optional
-from services.database import bulk_insert_events
-
 
 
 class TaskSubmission(BaseModel):
@@ -56,12 +55,12 @@ class Worker:
             metadata = MetadataMessage.model_validate_json(message)
             self.logger.info(f"Received message for batch {metadata.batch_id}")
 
-            # Download file from MinIO
+            # Download file from Storage
             file_content = await self.storage_handler.download_file(
                 bucket_name=metadata.bucket_name, object_name=metadata.object_name
             )
             self.logger.info(
-                f"Downloaded file from MinIO: {metadata.object_name} for batch {metadata.batch_id}"
+                f"Downloaded file from storage: {metadata.object_name} for batch {metadata.batch_id}"
             )
 
             try:
@@ -179,12 +178,12 @@ class Worker:
 
                 self.logger.info(f"Finished processing batch {metadata.batch_id}")
 
-                # Delete the processed file from MinIO
+                # Delete the processed file from Storage
                 await self.storage_handler.delete_file(
                     bucket_name=metadata.bucket_name,
                     object_name=metadata.object_name
                 )
-                self.logger.info(f"Deleted processed file {metadata.object_name} from MinIO")
+                self.logger.info(f"Deleted processed file {metadata.object_name} from storage")
 
             except Exception as e:
                 self.logger.error(f"Error during processing: {str(e)}")

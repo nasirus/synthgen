@@ -138,6 +138,45 @@ services:
     networks:
       - synthetic-data-network
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    deploy:
+      mode: replicated
+      replicas: ${NUM_WORKERS:-1}
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1024M
+    environment:
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=synthetic_data
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+    env_file:
+      - ./src/.env
+    networks:
+      - synthetic-data-network
+
 volumes:
   postgres_data:
   minio_data:

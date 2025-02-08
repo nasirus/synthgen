@@ -56,7 +56,7 @@ class StorageHandler:
 
     async def download_file(self, bucket_name: str, object_name: str) -> bytes:
         """
-        Download a file from MinIO.
+        Download a file from Storage.
         
         Args:
             bucket_name: Name of the bucket
@@ -79,7 +79,7 @@ class StorageHandler:
 
     async def delete_file(self, bucket_name: str, object_name: str) -> None:
         """
-        Delete a file from MinIO.
+        Delete a file from Storage.
         
         Args:
             bucket_name: Name of the bucket

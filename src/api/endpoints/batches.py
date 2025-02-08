@@ -94,8 +94,8 @@ class TaskListSubmission(BaseModel):
 async def get_batch(batch_id: str, db: Connection = Depends(get_async_db)):
     logger.info(f"Fetching status for batch {batch_id}")
     try:
-        with db.cursor(row_factory=dict_row) as cur:
-            cur.execute(
+        async with db.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
                 """
                 SELECT 
                     batch_id,
@@ -123,7 +123,7 @@ async def get_batch(batch_id: str, db: Connection = Depends(get_async_db)):
                 ),
             )
 
-            batch_stats = cur.fetchone()
+            batch_stats = await cur.fetchone()
 
         if not batch_stats:
             raise HTTPException(
@@ -355,15 +355,15 @@ async def list_batches(
     try:
         offset = (page - 1) * page_size
 
-        with db.cursor(row_factory=dict_row) as cur:
+        async with db.cursor(row_factory=dict_row) as cur:
             # Get total count of non-null batch_ids
-            cur.execute(
+            await cur.execute(
                 "SELECT COUNT(DISTINCT batch_id) AS total_batches FROM events WHERE batch_id IS NOT NULL"
             )
-            total_batches = cur.fetchone()["total_batches"]
+            total_batches = (await cur.fetchone())["total_batches"]
 
             # Get all batch statistics in a single query
-            cur.execute(
+            await cur.execute(
                 """
                 SELECT 
                     e.batch_id,
@@ -394,7 +394,7 @@ async def list_batches(
                 ),
             )
 
-            batch_stats = cur.fetchall()
+            batch_stats = await cur.fetchall()
 
         batches = []
         for stats in batch_stats:
@@ -468,13 +468,13 @@ async def get_batch_tasks(
     try:
         offset = (page - 1) * page_size
 
-        with db.cursor(row_factory=dict_row) as cur:
+        async with db.cursor(row_factory=dict_row) as cur:
             # Get total count
-            cur.execute("SELECT COUNT(*) FROM events WHERE batch_id = %s", (batch_id,))
-            total_tasks = cur.fetchone()["count"]
+            await cur.execute("SELECT COUNT(*) FROM events WHERE batch_id = %s", (batch_id,))
+            total_tasks = (await cur.fetchone())["count"]
 
             # Get paginated tasks
-            cur.execute(
+            await cur.execute(
                 """
                 SELECT *
                 FROM events
@@ -485,7 +485,7 @@ async def get_batch_tasks(
                 (batch_id, page_size, offset),
             )
 
-            tasks = cur.fetchall()
+            tasks = await cur.fetchall()
 
         if not tasks and page == 1:
             raise HTTPException(
@@ -535,10 +535,10 @@ async def get_batch_tasks(
 async def delete_batch(batch_id: str, db: Connection = Depends(get_async_db)):
     logger.info(f"Deleting batch {batch_id}")
     try:
-        with db.cursor(row_factory=dict_row) as cur:
+        async with db.cursor(row_factory=dict_row) as cur:
             # First check if the batch exists
-            cur.execute("SELECT COUNT(*) FROM events WHERE batch_id = %s", (batch_id,))
-            count = cur.fetchone()["count"]
+            await cur.execute("SELECT COUNT(*) FROM events WHERE batch_id = %s", (batch_id,))
+            count = (await cur.fetchone())["count"]
 
             if count == 0:
                 raise HTTPException(
@@ -546,8 +546,8 @@ async def delete_batch(batch_id: str, db: Connection = Depends(get_async_db)):
                 )
 
             # Delete all events associated with the batch
-            cur.execute("DELETE FROM events WHERE batch_id = %s", (batch_id,))
-            db.commit()
+            await cur.execute("DELETE FROM events WHERE batch_id = %s", (batch_id,))
+            await db.commit()
 
             logger.info(f"Successfully deleted batch {batch_id}")
             return None

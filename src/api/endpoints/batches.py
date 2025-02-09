@@ -55,6 +55,7 @@ setup_logging()
 
 class BulkTaskResponse(BaseModel):
     batch_id: str
+    total_tasks: int
 
 
 class BatchListResponse(BaseModel):
@@ -285,7 +286,8 @@ async def submit_bulk_tasks(
     try:
         batch_id = batch_id or str(uuid.uuid4())
         content = await file.read()
-
+        total_tasks = len(content.decode('utf-8').strip().split('\n'))
+        
         # Upload file to MinIO
         object_name = f"batches/{batch_id}/{file.filename}"
         await storage_handler.upload_file(
@@ -306,7 +308,7 @@ async def submit_bulk_tasks(
         await rabbitmq_handler.publish_message(message, "data_generation_batch")
         logger.info(f"Sent metadata message to RabbitMQ for batch {batch_id}")
 
-        return BulkTaskResponse(batch_id=batch_id)
+        return BulkTaskResponse(batch_id=batch_id, total_tasks=total_tasks)
 
     except Exception as e:
         logger.error(f"Failed to process bulk request: {str(e)}")

@@ -49,7 +49,7 @@ impl Settings {
 
 fn init_logging() {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive(tracing::Level::DEBUG.into())) // Set default level to DEBUG
+        .with_env_filter(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into())) // Set default level to DEBUG
         .with_target(true) // Include the target (module path) in the log output
         .with_thread_ids(true) // Include thread IDs
         .with_line_number(true) // Include line numbers

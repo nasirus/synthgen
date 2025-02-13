@@ -288,8 +288,12 @@ async def submit_bulk_tasks(
         content = await file.read()
         total_tasks = len(content.decode('utf-8').strip().split('\n'))
         
+        # Generate unique identifier for the file
+        file_id = str(uuid.uuid4())
+        # Create object name with unique identifier
+        object_name = f"batches/{batch_id}/{file.filename}_{file_id}"
+        
         # Upload file to MinIO
-        object_name = f"batches/{batch_id}/{file.filename}"
         await storage_handler.upload_file(
             bucket_name=settings.S3_BUCKET_NAME,
             object_name=object_name,

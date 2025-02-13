@@ -114,7 +114,7 @@ services:
       - synthetic-data-network
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-02-07T23-21-09Z
     deploy:
       resources:
         limits:
@@ -177,9 +177,34 @@ services:
     networks:
       - synthetic-data-network
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+    container_name: es01
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1024M
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - synthetic-data-network
+
 volumes:
   postgres_data:
   minio_data:
+  elasticsearch_data:
 
 # Add networks configuration at the bottom of the file
 networks:

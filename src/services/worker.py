@@ -4,14 +4,15 @@ import logging
 import uuid
 import datetime
 import platform
+from hashlib import sha256
 
 from core.config import settings
 from schemas.task_status import TaskStatus
 from services.message_queue import RabbitMQHandler
 from services.storage import StorageHandler
-from services.database import bulk_insert_events
 from pydantic import BaseModel, ValidationError
 from typing import Any, Dict, Optional
+from database.elastic_session import get_elasticsearch_client
 
 
 class TaskSubmission(BaseModel):
@@ -37,6 +38,7 @@ class Worker:
         self.storage_handler = StorageHandler()
         self.logger = logging.getLogger(__name__)
         self.setup_logging()
+        self.es_client = get_elasticsearch_client()
 
     def setup_logging(self):
         """Configure logging for the worker."""
@@ -48,6 +50,30 @@ class Worker:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.INFO)
+
+    async def bulk_insert_elasticsearch(self, documents: list) -> None:
+        """Helper function to perform bulk insert into Elasticsearch."""
+        bulk_data = []
+        for doc in documents:
+            # Add the action line
+            bulk_data.append({"index": {"_index": "events", "_id": doc["message_id"]}})
+            # Add the document data line
+            bulk_data.append({
+                "message_id": doc["message_id"],
+                "batch_id": doc["batch_id"],
+                "created_at": doc["created_at"],
+                "status": doc["status"],
+                "custom_id": doc["custom_id"],
+                "method": doc["method"],
+                "url": doc["url"],
+                "body_hash": doc["body_hash"],
+                "body": doc["body"],
+                "dataset": doc["dataset"],
+                "source": doc["source"]
+            })
+
+        if bulk_data:
+            await self.es_client.bulk(operations=bulk_data, refresh=True)
 
     async def process_message(self, message: bytes):
         """Processes a single message from the queue."""
@@ -78,8 +104,8 @@ class Worker:
                     chunk_end = min(chunk_start + CHUNK_SIZE, total_lines)
                     current_chunk = lines[chunk_start:chunk_end]
 
-                    rows_to_copy = []
                     messages_to_publish = []
+                    es_documents = []
 
                     for line_number, line in enumerate(current_chunk, chunk_start + 1):
                         try:
@@ -94,20 +120,24 @@ class Worker:
                             TaskSubmission.model_validate(task_data)
 
                             message_id = str(uuid.uuid4())
-                            rows_to_copy.append(
-                                (
-                                    message_id,
-                                    metadata.batch_id,
-                                    timestamp,
-                                    TaskStatus.PENDING.value,
-                                    task_data["custom_id"],
-                                    task_data["method"],
-                                    task_data["url"],
-                                    json.dumps(task_data["body"]),
-                                    task_data.get("dataset", None),
-                                    json.dumps(task_data.get("source", None)),
-                                )
-                            )
+                            body_json = json.dumps(task_data["body"])
+                            body_hash = sha256(body_json.encode()).hexdigest()
+
+                            # Prepare Elasticsearch document
+                            es_documents.append({
+                                "message_id": message_id,
+                                "batch_id": metadata.batch_id,
+                                "created_at": timestamp,
+                                "status": TaskStatus.PENDING.value,
+                                "custom_id": task_data["custom_id"],
+                                "method": task_data["method"],
+                                "url": task_data["url"],
+                                "body_hash": body_hash,
+                                "body": task_data["body"],
+                                "dataset": task_data.get("dataset", None),
+                                "source": task_data.get("source", None)
+                            })
+
                             messages_to_publish.append(
                                 {
                                     "message_id": message_id,
@@ -131,7 +161,7 @@ class Worker:
                             )
                             continue
 
-                    if not rows_to_copy:
+                    if not es_documents:
                         self.logger.warning(
                             f"No valid tasks found in chunk {chunk_start}-{chunk_end} of batch {metadata.batch_id}"
                         )
@@ -142,10 +172,10 @@ class Worker:
                     retry_count = 0
                     while retry_count < max_retries:
                         try:
-                            # Bulk insert into database
-                            await bulk_insert_events(rows_to_copy)
+                            # Bulk insert into Elasticsearch
+                            await self.bulk_insert_elasticsearch(es_documents)
                             self.logger.info(
-                                f"Successfully inserted chunk {chunk_start}-{chunk_end} ({len(rows_to_copy)} tasks) for batch {metadata.batch_id}"
+                                f"Successfully inserted chunk {chunk_start}-{chunk_end} ({len(es_documents)} tasks) into Elasticsearch for batch {metadata.batch_id}"
                             )
                             break
                         except Exception as e:
@@ -154,7 +184,7 @@ class Worker:
                                 self.logger.error(f"Failed to insert chunk after {max_retries} attempts: {str(e)}")
                                 raise
                             self.logger.warning(f"Retry {retry_count}/{max_retries} for database insertion")
-                            await asyncio.sleep(1 * retry_count)  # Exponential backoff
+                            await asyncio.sleep(1 * retry_count)
 
                     # Add retry logic for message publishing
                     retry_count = 0
@@ -214,9 +244,14 @@ class Worker:
                 # Optional: Implement a retry mechanism with backoff
                 await asyncio.sleep(5)  # Wait before restarting
 
+    async def initialize(self):
+        await self.rabbitmq_handler.ensure_initialized()
+        # Add other async initialization code here
+
 
 async def main():
     worker = Worker()
+    await worker.initialize()
     await worker.run()
 
 

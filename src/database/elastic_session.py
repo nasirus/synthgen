@@ -60,4 +60,8 @@ class ElasticsearchClient:
         await self.client.close()
 
 # Create a global instance
-es_client = ElasticsearchClient() 
+es_client = ElasticsearchClient()
+
+def get_elasticsearch_client():
+    """Get the global Elasticsearch client instance."""
+    return es_client.client 

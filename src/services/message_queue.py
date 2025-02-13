@@ -15,26 +15,62 @@ load_dotenv()
 
 
 class RabbitMQHandler:
-    _instance = None  # Class variable to hold the single instance
+    _instance = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(RabbitMQHandler, cls).__new__(cls)
             cls._instance.connection = None
             cls._instance.channel = None
-            cls._instance._initialize()  # Call _initialize only once
+            cls._instance._initialized = False
         return cls._instance
 
-    def _initialize(self):
+    async def _initialize(self):
+        """Initialize async components"""
+        if self._initialized:
+            return
+            
         # Initialize Elasticsearch index
-        import asyncio
-
-        asyncio.run(es_client.create_index_if_not_exists())
-
+        await es_client.create_index_if_not_exists()
+        
         # Initialize queues
-        self.connect_sync()
+        await self.connect()
+        self._initialized = True
 
-    def connect_sync(self):
+    async def ensure_initialized(self):
+        """Ensure handler is initialized"""
+        if not self._initialized:
+            await self._initialize()
+
+    async def connect(self):
+        """Establish async connection to RabbitMQ"""
+        if not self.connection or self.connection.is_closed:
+            self.connection = await connect_robust(
+                host=settings.RABBITMQ_HOST,
+                port=settings.RABBITMQ_PORT,
+                login=settings.RABBITMQ_USER,
+                password=settings.RABBITMQ_PASS,
+            )
+            self.channel = await self.connection.channel()
+            # Declare queues
+            await self.channel.declare_queue(name="data_generation_tasks", durable=True)
+            logger.info("Declared data_generation_tasks queue")
+            await self.channel.declare_queue(name="data_generation_batch", durable=True)
+            logger.info("Declared data_generation_batch queue")
+
+    def normalize_payload(self, payload):
+        if payload is None:
+            return None
+        elif isinstance(payload, (str, int, float, bool)):
+            return payload
+        elif isinstance(payload, list):
+            return [self.normalize_payload(item) for item in payload]
+        elif isinstance(payload, dict):
+            return {k: self.normalize_payload(v) for k, v in sorted(payload.items())}
+        else:
+            return str(payload)
+
+    async def connect_sync(self):
         """Establish sync connection to RabbitMQ to declare queues"""
         import pika
 
@@ -53,39 +89,6 @@ class RabbitMQHandler:
         logger.info("Declared data_generation_batch queue")
         connection.close()
 
-    def normalize_payload(self, payload):
-        if payload is None:
-            return None
-        elif isinstance(payload, (str, int, float, bool)):
-            return payload
-        elif isinstance(payload, list):
-            return [self.normalize_payload(item) for item in payload]
-        elif isinstance(payload, dict):
-            return {k: self.normalize_payload(v) for k, v in sorted(payload.items())}
-        else:
-            return str(payload)
-
-    async def connect(self):
-        """Establish async connection to RabbitMQ"""
-        if not self.connection or self.connection.is_closed:
-            self.connection = await connect_robust(
-                host=settings.RABBITMQ_HOST,
-                port=settings.RABBITMQ_PORT,
-                login=settings.RABBITMQ_USER,
-                password=settings.RABBITMQ_PASS,
-            )
-            self.channel = await self.connection.channel()
-
-    async def ensure_connection(self):
-        """Ensure that async connection and channel are available"""
-        try:
-            if not self.connection or self.connection.is_closed:
-                await self.connect()
-            elif not self.channel or self.channel.is_closed:
-                self.channel = await self.connection.channel()
-        except Exception:
-            await self.connect()
-
     async def publish_bulk_messages(
         self, messages: List[dict[str, Any]], queue_name: str
     ) -> List[str]:
@@ -94,7 +97,7 @@ class RabbitMQHandler:
         Each message is expected to already have keys: "message_id", "timestamp",
         "payload", and "batch_id".
         """
-        await self.ensure_connection()
+        await self.ensure_initialized()
         published_message_ids = [msg["message_id"] for msg in messages]
 
         try:
@@ -125,7 +128,7 @@ class RabbitMQHandler:
         Publish a single message to the RabbitMQ queue.  This is used for
         the file upload metadata.
         """
-        await self.ensure_connection()
+        await self.ensure_initialized()
         logger.info(f"Publishing message to RabbitMQ: {message}")
 
         try:

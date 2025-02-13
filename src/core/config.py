@@ -43,8 +43,13 @@ class Settings:
     S3_ENDPOINT: str = os.getenv("S3_ENDPOINT", "http://minio:9000")
     S3_ACCESS_KEY: str = os.getenv("S3_ACCESS_KEY", "minioadmin")
     S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "minioadmin")
-
     S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "synthetic-data-generator")
+
+    # Elasticsearch Settings
+    ELASTICSEARCH_HOST: str = os.getenv("ELASTICSEARCH_HOST", "localhost")
+    ELASTICSEARCH_PORT: int = int(os.getenv("ELASTICSEARCH_PORT", 9200))
+    ELASTICSEARCH_USER: str = os.getenv("ELASTICSEARCH_USER", "elastic")
+    ELASTICSEARCH_PASSWORD: str = os.getenv("ELASTICSEARCH_PASSWORD", "changeme")
 
 
 settings = Settings()

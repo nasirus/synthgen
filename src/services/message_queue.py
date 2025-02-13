@@ -2,11 +2,11 @@ import json
 from typing import Any, List
 from dotenv import load_dotenv
 from schemas.task_status import TaskStatus
-from database.session import pool
 from aio_pika import connect_robust, Message, DeliveryMode
 from core.config import settings
 import logging
 import aio_pika
+from database.elastic_session import es_client
 
 # Create a logger instance at module level
 logger = logging.getLogger(__name__)
@@ -26,34 +26,11 @@ class RabbitMQHandler:
         return cls._instance
 
     def _initialize(self):
-        # Initialize database by ensuring the events table exists
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS events (
-                        batch_id VARCHAR(255),
-                        message_id VARCHAR(255) NOT NULL,
-                        custom_id VARCHAR(255) NOT NULL,
-                        method VARCHAR(255) NOT NULL,
-                        url VARCHAR(255) NOT NULL,                       
-                        body JSONB,
-                        result JSONB,
-                        status VARCHAR(50) NOT NULL,
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                        started_at TIMESTAMP WITH TIME ZONE,
-                        completed_at TIMESTAMP WITH TIME ZONE,
-                        duration INTEGER,
-                        prompt_tokens INTEGER,
-                        completion_tokens INTEGER,
-                        total_tokens INTEGER,
-                        cached BOOLEAN DEFAULT FALSE,
-                        attempt INTEGER DEFAULT 0,
-                        dataset VARCHAR(255),
-                        source JSONB
-                    )
-                """
-                )
+        # Initialize Elasticsearch index
+        import asyncio
+
+        asyncio.run(es_client.create_index_if_not_exists())
+
         # Initialize queues
         self.connect_sync()
 
@@ -109,7 +86,9 @@ class RabbitMQHandler:
         except Exception:
             await self.connect()
 
-    async def publish_bulk_messages(self, messages: List[dict[str, Any]], queue_name: str) -> List[str]:
+    async def publish_bulk_messages(
+        self, messages: List[dict[str, Any]], queue_name: str
+    ) -> List[str]:
         """
         Asynchronously publish a batch of messages to RabbitMQ with publisher confirms.
         Each message is expected to already have keys: "message_id", "timestamp",
@@ -135,7 +114,6 @@ class RabbitMQHandler:
                     routing_key=queue_name,
                     timeout=30,  # Add timeout for publish confirmation
                 )
-
 
             return published_message_ids
 

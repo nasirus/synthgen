@@ -1,92 +1,40 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
 use chrono::{DateTime, Utc};
-use serde_json::Value;
-use tokio_postgres;
-use tokio_postgres::types::Json;
-use uuid::Uuid;
-
-use deadpool_postgres::tokio_postgres::NoTls;
-use deadpool_postgres::{Config as PoolConfig, ManagerConfig, Pool, RecyclingMethod};
+use elasticsearch::{
+    http::transport::Transport, params::Refresh, Elasticsearch, SearchParts, UpdateParts,
+};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use crate::schemas::llm_response::{LLMResponse, Usage};
 use crate::schemas::task_status::TaskStatus;
 use crate::settings::DatabaseSettings;
 
 pub struct DatabaseClient {
-    pool: Pool,
+    client: Elasticsearch,
 }
 
 impl DatabaseClient {
-    /// Creates a new DatabaseClient with a connection pool from deadpool-postgres.
     pub async fn new(
         db_settings: &DatabaseSettings,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let pool_config = PoolConfig {
-            host: Some(db_settings.host.clone()),
-            port: Some(db_settings.port),
-            user: Some(db_settings.user.clone()),
-            password: Some(db_settings.password.clone()),
-            dbname: Some(db_settings.dbname.clone()),
-            pool: Some(deadpool::managed::PoolConfig {
-                max_size: 2,
-                timeouts: deadpool::managed::Timeouts {
-                    wait: Some(std::time::Duration::from_secs(10)),
-                    create: Some(std::time::Duration::from_secs(10)),
-                    recycle: Some(std::time::Duration::from_secs(10)),
-                },
-                ..Default::default()
-            }),
-            manager: Some(ManagerConfig {
-                recycling_method: RecyclingMethod::Fast,
-            }),
-            ..Default::default()
-        };
+        let transport = Transport::single_node(&format!(
+            "http://{}:{}@{}:{}",
+            db_settings.user, db_settings.password, db_settings.host, db_settings.port
+        ))?;
 
-        let pool = pool_config.create_pool(Some(deadpool_postgres::Runtime::Tokio1), NoTls)?;
-        Ok(DatabaseClient { pool })
+        let client = Elasticsearch::new(transport);
+
+        Ok(DatabaseClient { client })
     }
 
-    /// Inserts an error event into the database.
-    pub async fn insert_error(
-        &self,
-        batch_id: Option<String>,
-        payload: Value,
-        error: &str,
-        started_at: DateTime<Utc>,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let message_id = Uuid::new_v4().to_string();
-        let completed_at = Utc::now();
-        let duration = completed_at
-            .signed_duration_since(started_at)
-            .num_milliseconds() as i32;
-
-        let client = self.pool.get().await?;
-        client
-            .execute(
-                "INSERT INTO events (
-                batch_id, message_id, status, payload, result, 
-                started_at, completed_at, duration,
-                cached
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-                &[
-                    &batch_id,
-                    &message_id,
-                    &TaskStatus::Failed.as_str(),
-                    &Json(payload),
-                    &Json(serde_json::json!({
-                        "error": error,
-                    })),
-                    &started_at,
-                    &completed_at,
-                    &duration,
-                    &false,
-                ],
-            )
-            .await?;
-
-        Ok(())
+    fn calculate_body_hash(&self, body: &Value) -> String {
+        let mut hasher = Sha256::new();
+        let json_str = serde_json::to_string(body).unwrap();
+        hasher.update(json_str.as_bytes());
+        STANDARD.encode(hasher.finalize())
     }
 
-    /// Updates the event status based on the stage of the request.
     pub async fn update_event_status(
         &self,
         message_id: String,
@@ -99,91 +47,91 @@ impl DatabaseClient {
             .signed_duration_since(started_at)
             .num_milliseconds() as i32;
 
-        let client = self.pool.get().await?;
-        if status == TaskStatus::Processing {
-            client
-                .execute(
-                    "UPDATE events SET started_at = $1, status = $2 WHERE message_id = $3",
-                    &[&started_at, &status.as_str(), &message_id],
-                )
-                .await?;
-        } else if status == TaskStatus::Completed || status == TaskStatus::Failed {
-            client
-                .execute(
-                    "UPDATE events 
-                SET completed_at = $1, 
-                    status = $2, 
-                    duration = $3, 
-                    result = $4, 
-                    prompt_tokens = $5, 
-                    completion_tokens = $6, 
-                    total_tokens = $7,
-                    cached = $8,
-                    attempt = $9
-                WHERE message_id = $10",
-                    &[
-                        &completed_at,
-                        &status.as_str(),
-                        &duration,
-                        &Json(serde_json::json!({
-                            "completion": llm_response.content,
-                        })),
-                        &(llm_response.usage.prompt_tokens as i32),
-                        &(llm_response.usage.completion_tokens as i32),
-                        &(llm_response.usage.total_tokens as i32),
-                        &llm_response.cached,
-                        &(llm_response.attempt as i32),
-                        &message_id,
-                    ],
-                )
-                .await?;
-        }
+        let doc = json!({
+            "doc": {
+                "completed_at": completed_at,
+                "started_at": started_at,
+                "status": status.as_str(),
+                "duration": duration,
+                "result": {
+                    "completion": llm_response.content
+                },
+                "prompt_tokens": llm_response.usage.prompt_tokens,
+                "completion_tokens": llm_response.usage.completion_tokens,
+                "total_tokens": llm_response.usage.total_tokens,
+                "cached": llm_response.cached,
+                "attempt": llm_response.attempt
+            }
+        });
 
+        let response = self
+            .client
+            .update(UpdateParts::IndexId("events", &message_id))
+            .body(doc)
+            .refresh(Refresh::False)
+            .send()
+            .await?;
+
+        if let Some(exception) = response.exception().await? {
+            return Err(format!("Failed to update document: {:?}", exception).into());
+        }
         Ok(())
     }
 
-    /// Attempts to retrieve a cached LLMResponse from the database based on the payload.
     pub async fn get_cached_completion(
         &self,
         body: &Value,
     ) -> Result<Option<LLMResponse>, Box<dyn std::error::Error + Send + Sync>> {
-        let client = self.pool.get().await?;
-        let row = client
-            .query_opt(
-                "SELECT result FROM events WHERE status = $1 AND body = $2 LIMIT 1",
-                &[&TaskStatus::Completed.as_str(), &Json(body)],
-            )
+        let body_hash = self.calculate_body_hash(body);
+
+        let query = json!({
+            "query": {
+                "bool": {
+                    "must": [
+                        { "term": { "status": TaskStatus::Completed.as_str() }},
+                        { "term": { "body_hash": body_hash }}
+                    ]
+                }
+            },
+            "size": 1,
+            "_source": ["result"]
+        });
+
+        let response = self
+            .client
+            .search(SearchParts::Index(&["events"]))
+            .body(query)
+            .send()
             .await?;
 
-        if let Some(row) = row {
-            let result: Json<Value> = row.get(0);
-            let completion = result.0["completion"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
+        let response_body = response.json::<Value>().await?;
 
-            let llm_response = LLMResponse {
-                content: completion,
-                usage: Usage {
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                    total_tokens: 0,
-                },
-                cached: true,
-                attempt: 0,
-            };
-
-            Ok(Some(llm_response))
-        } else {
-            Ok(None)
+        if let Some(hit) = response_body["hits"]["hits"]
+            .as_array()
+            .and_then(|hits| hits.first())
+        {
+            if let Some(completion) = hit["_source"]["result"]["completion"].as_str() {
+                return Ok(Some(LLMResponse {
+                    content: completion.to_string(),
+                    usage: Usage {
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0,
+                    },
+                    cached: true,
+                    attempt: 0,
+                }));
+            }
         }
+
+        Ok(None)
     }
 }
 
 impl Clone for DatabaseClient {
     fn clone(&self) -> Self {
         DatabaseClient {
-            pool: self.pool.clone(),
+            client: self.client.clone(),
         }
     }
 }

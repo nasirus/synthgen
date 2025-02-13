@@ -209,27 +209,27 @@ async fn process_message(
     info!("Processing message {}", message_id);
 
     // Update status to PROCESSING
-    // if let Err(e) = db_client
-    //     .update_event_status(
-    //         message_id.to_string(),
-    //         schemas::task_status::TaskStatus::Processing,
-    //         &schemas::llm_response::LLMResponse {
-    //             content: String::new(),
-    //             usage: schemas::llm_response::Usage {
-    //                 prompt_tokens: 0,
-    //                 completion_tokens: 0,
-    //                 total_tokens: 0,
-    //             },
-    //             cached: false,
-    //             attempt: 0,
-    //         },
-    //         started_at,
-    //     )
-    //     .await
-    // {
-    //     error!("Failed to update status to PROCESSING: {}", e);
-    //     return;
-    // }
+    if let Err(e) = db_client
+        .update_event_status(
+            message_id.to_string(),
+            schemas::task_status::TaskStatus::Processing,
+            &schemas::llm_response::LLMResponse {
+                content: String::new(),
+                usage: schemas::llm_response::Usage {
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    total_tokens: 0,
+                },
+                cached: false,
+                attempt: 0,
+            },
+            started_at,
+        )
+        .await
+    {
+        error!("Failed to update status to PROCESSING: {}", e);
+        return;
+    }
 
     // Check cache
     if let Ok(Some(cached_response)) = db_client.get_cached_completion(&payload["body"]).await {

@@ -21,32 +21,6 @@ services:
     networks:
       - synthetic-data-network
 
-  postgres:
-    image: postgres:17.2
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 4096M
-    container_name: postgres
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=synthetic_data
-      - POSTGRES_MAX_CONNECTIONS=1000
-      - POSTGRES_SHARED_BUFFERS=1024MB   
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - synthetic-data-network
-
   api:
     build: .
     deploy:
@@ -62,15 +36,10 @@ services:
       - RABBITMQ_PASS=guest
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=synthetic_data
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432   
     depends_on:
       rabbitmq:
         condition: service_healthy
-      postgres:
+      elasticsearch:
         condition: service_healthy
       minio:
         condition: service_healthy
@@ -95,16 +64,11 @@ services:
       - RABBITMQ_PASS=guest
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=synthetic_data
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
       - CONSUMER_ID=${CONSUMER_ID:-1}
     depends_on:
       rabbitmq:
         condition: service_healthy
-      postgres:
+      elasticsearch:
         condition: service_healthy
     volumes:
       - ./src:/app/src
@@ -154,11 +118,6 @@ services:
       - RABBITMQ_PASS=guest
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=synthetic_data
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
       - MINIO_HOST=minio
@@ -166,9 +125,9 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
       minio:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
     volumes:
       - ./src:/app/src
@@ -202,7 +161,6 @@ services:
       - synthetic-data-network
 
 volumes:
-  postgres_data:
   minio_data:
   elasticsearch_data:
 

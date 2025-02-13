@@ -6,5 +6,4 @@ pub struct DatabaseSettings {
     pub port: u16,
     pub user: String,
     pub password: String,
-    pub dbname: String,
 } 

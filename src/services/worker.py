@@ -4,6 +4,7 @@ import logging
 import uuid
 import datetime
 import platform
+import base64
 from hashlib import sha256
 
 from core.config import settings
@@ -69,11 +70,12 @@ class Worker:
                 "body_hash": doc["body_hash"],
                 "body": doc["body"],
                 "dataset": doc["dataset"],
-                "source": doc["source"]
+                "source": doc["source"],
+                "attempt": 0
             })
 
         if bulk_data:
-            await self.es_client.bulk(operations=bulk_data, refresh=True)
+            await self.es_client.client.bulk(operations=bulk_data, refresh=True)
 
     async def process_message(self, message: bytes):
         """Processes a single message from the queue."""
@@ -120,8 +122,11 @@ class Worker:
                             TaskSubmission.model_validate(task_data)
 
                             message_id = str(uuid.uuid4())
-                            body_json = json.dumps(task_data["body"])
-                            body_hash = sha256(body_json.encode()).hexdigest()
+                            # Ensure consistent JSON serialization with compact format
+                            body_json = json.dumps(task_data["body"], sort_keys=True, separators=(',', ':'))
+                            hasher = sha256()
+                            hasher.update(body_json.encode('utf-8'))
+                            body_hash = base64.b64encode(hasher.digest()).decode('utf-8')
 
                             # Prepare Elasticsearch document
                             es_documents.append({

@@ -159,7 +159,7 @@ async def submit_bulk_tasks(
 
         # Upload file to MinIO
         await storage_handler.upload_file(
-            bucket_name=settings.S3_BUCKET_NAME,
+            bucket_name=settings.MINIO_BUCKET_NAME,
             object_name=object_name,
             file_data=content,
         )
@@ -171,7 +171,7 @@ async def submit_bulk_tasks(
             "batch_id": batch_id,
             "object_name": object_name,
             "upload_timestamp": timestamp,
-            "bucket_name": settings.S3_BUCKET_NAME,
+            "bucket_name": settings.MINIO_BUCKET_NAME,
         }
         await rabbitmq_handler.publish_message(message, "data_generation_batch")
         logger.info(f"Sent metadata message to RabbitMQ for batch {batch_id}")

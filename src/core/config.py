@@ -39,11 +39,13 @@ class Settings:
     # Chunk size for bulk inserts
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", 1000))
 
-    # S3 Settings
-    S3_ENDPOINT: str = os.getenv("S3_ENDPOINT", "http://minio:9000")
-    S3_ACCESS_KEY: str = os.getenv("S3_ACCESS_KEY", "minioadmin")
-    S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "minioadmin")
-    S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "synthetic-data-generator")
+    # MINIO Settings
+    MINIO_HOST: str = os.getenv("MINIO_HOST", "localhost")
+    MINIO_PORT: int = int(os.getenv("MINIO_PORT", 9000))
+    MINIO_HOST_URL: str = f"http://{MINIO_HOST}:{MINIO_PORT}"
+    MINIO_ROOT_USER: str = os.getenv("MINIO_ROOT_USER", "minioadmin")
+    MINIO_ROOT_PASSWORD: str = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
+    MINIO_BUCKET_NAME: str = os.getenv("MINIO_BUCKET_NAME", "synthetic-data-generator")
 
     # Elasticsearch Settings
     ELASTICSEARCH_HOST: str = os.getenv("ELASTICSEARCH_HOST", "localhost")

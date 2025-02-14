@@ -10,14 +10,13 @@ services:
     ports:
       - "5672:5672"   # RabbitMQ default port
       - "15672:15672" # RabbitMQ management interface port
-    environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
       interval: 30s
       timeout: 10s
       retries: 5
+    env_file:
+      - ./src/.local.env
     networks:
       - synthetic-data-network
 
@@ -31,11 +30,6 @@ services:
     container_name: synthetic-data-api
     ports:
       - "8002:8000"
-    environment:
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASS=guest
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -44,7 +38,9 @@ services:
       minio:
         condition: service_healthy
     volumes:
-      - ./src:/app/src 
+      - ./src:/app/src
+    env_file:
+      - ./src/.local.env
     networks:
       - synthetic-data-network
 

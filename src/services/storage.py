@@ -13,9 +13,9 @@ class StorageHandler:
         """Initialize MinIO client with configuration from settings."""
         self.client = boto3.client(
             "s3",
-            endpoint_url=settings.S3_ENDPOINT,
-            aws_access_key_id=settings.S3_ACCESS_KEY,
-            aws_secret_access_key=settings.S3_SECRET_KEY,
+            endpoint_url=settings.MINIO_HOST_URL,
+            aws_access_key_id=settings.MINIO_ROOT_USER,
+            aws_secret_access_key=settings.MINIO_ROOT_PASSWORD,
             config=Config(signature_version="s3v4"),
 
         )
@@ -24,11 +24,11 @@ class StorageHandler:
     def _ensure_bucket_exists(self) -> None:
         """Ensure the configured bucket exists, create if it doesn't."""
         try:
-            self.client.head_bucket(Bucket=settings.S3_BUCKET_NAME)
+            self.client.head_bucket(Bucket=settings.MINIO_BUCKET_NAME)
         except botocore.exceptions.ClientError:
             try:
-                self.client.create_bucket(Bucket=settings.S3_BUCKET_NAME)
-                logger.info(f"Created bucket: {settings.S3_BUCKET_NAME}")
+                self.client.create_bucket(Bucket=settings.MINIO_BUCKET_NAME)
+                logger.info(f"Created bucket: {settings.MINIO_BUCKET_NAME}")
             except Exception as e:
                 logger.error(f"Failed to create bucket: {str(e)}")
 

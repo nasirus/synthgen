@@ -120,21 +120,70 @@ class ElasticsearchClient:
         }
 
         result = await self.client.search(index="events", body=query)
-        return self._process_batch_list(result, page, page_size)
+        return self._process_batch_list(result)
 
-    async def get_batch_tasks(
-        self, batch_id: str, page: int, page_size: int
-    ) -> Dict[str, Any]:
-        """Get paginated list of tasks for a specific batch."""
+    async def get_batch_tasks(self, batch_id: str) -> Dict[str, Any]:
+        """Get all tasks for a specific batch using scroll API."""
         query = {
             "query": {"term": {"batch_id": batch_id}},
             "sort": [{"created_at": "desc"}],
-            "from": (page - 1) * page_size,
-            "size": page_size,
+            "size": 1000  # Number of documents per scroll
         }
 
-        result = await self.client.search(index="events", body=query)
-        return self._process_batch_tasks(result, page, page_size)
+        # Initialize scroll
+        result = await self.client.search(
+            index="events",
+            body=query,
+            scroll="2m"  # Keep scroll context alive for 2 minutes
+        )
+        
+        scroll_id = result["_scroll_id"]
+        all_docs = result["hits"]["hits"]
+        total_documents = result["hits"]["total"]["value"]
+        
+        try:
+            # Keep scrolling until no more documents
+            while len(result["hits"]["hits"]) > 0:
+                result = await self.client.scroll(
+                    scroll_id=scroll_id,
+                    scroll="2m"
+                )
+                scroll_id = result["_scroll_id"]
+                all_docs.extend(result["hits"]["hits"])
+
+            # Process all documents
+            tasks = []
+            for hit in all_docs:
+                source = hit["_source"]
+                tasks.append({
+                    "message_id": source["message_id"],
+                    "batch_id": source["batch_id"],
+                    "status": source["status"],
+                    "cached": source.get("cached", False),
+                    "body": source.get("body", {}),
+                    "result": source.get("result", {}),
+                    "created_at": source.get("created_at"),
+                    "started_at": source.get("started_at"),
+                    "completed_at": source.get("completed_at"),
+                    "duration": source.get("duration"),
+                    "total_tokens": source.get("total_tokens", 0),
+                    "prompt_tokens": source.get("prompt_tokens", 0),
+                    "completion_tokens": source.get("completion_tokens", 0),
+                    "dataset": source.get("dataset"),
+                    "source": source.get("source"),
+                })
+
+            return {
+                "tasks": tasks,
+                "total": total_documents
+            }
+                
+        finally:
+            # Clean up scroll context
+            try:
+                await self.client.clear_scroll(scroll_id=scroll_id)
+            except Exception as e:
+                logger.warning(f"Failed to clear scroll context: {e}")
 
     def _process_batch_stats(
         self, result: Dict[str, Any], batch_id: str
@@ -186,54 +235,18 @@ class ElasticsearchClient:
             "completion_tokens": aggs["completion_stats"]["sum"] or 0,
         }
 
-    def _process_batch_tasks(
-        self, result: Dict[str, Any], page: int, page_size: int
-    ) -> Dict[str, Any]:
-        """Process raw Elasticsearch response for batch tasks."""
-        hits = result["hits"]
-        total = hits["total"]["value"]
-
-        tasks = []
-        for hit in hits["hits"]:
-            source = hit["_source"]
-            tasks.append(
-                {
-                    "message_id": source["message_id"],
-                    "batch_id": source["batch_id"],
-                    "status": source["status"],
-                    "cached": source.get("cached", False),
-                    "body": source.get("body", {}),
-                    "result": source.get("result", {}),
-                    "created_at": source.get("created_at"),
-                    "started_at": source.get("started_at"),
-                    "completed_at": source.get("completed_at"),
-                    "duration": source.get("duration"),
-                    "total_tokens": source.get("total_tokens", 0),
-                    "prompt_tokens": source.get("prompt_tokens", 0),
-                    "completion_tokens": source.get("completion_tokens", 0),
-                    "queue_position": None,  # Elasticsearch doesn't store this
-                    "dataset": source.get("dataset"),
-                    "source": source.get("source"),
-                }
-            )
-
-        return {"tasks": tasks, "total": total, "page": page, "page_size": page_size}
-
     def _process_batch_list(
-        self, result: Dict[str, Any], page: int, page_size: int
+        self, result: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Process raw Elasticsearch response for batch list."""
         aggs = result["aggregations"]
         all_batches = aggs["unique_batches"]["buckets"]
 
-        # Handle pagination in memory
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        paginated_batches = all_batches[start_idx:end_idx]
+
         total_batches = len(all_batches)
 
         batches = []
-        for bucket in paginated_batches:
+        for bucket in all_batches:
             batch_id = bucket["key"]
             status_buckets = {
                 b["key"]: b["doc_count"] for b in bucket["status_counts"]["buckets"]
@@ -263,13 +276,10 @@ class ElasticsearchClient:
             )
 
             # Calculate duration
-            created_at = bucket["time_stats"]["value_as_string"]
-            completed_at = bucket["completed_stats"]["value_as_string"]
-            started_at = (
-                bucket["started_stats"].get("value_as_string")
-                if bucket["started_stats"].get("value") is not None
-                else None
-            )
+            created_at = bucket["time_stats"].get("value_as_string")
+            completed_at = bucket["completed_stats"].get("value_as_string") if bucket["completed_stats"].get("value") is not None else None
+            started_at = bucket["started_stats"].get("value_as_string") if bucket["started_stats"].get("value") is not None else None
+
             duration = None
             if created_at and completed_at:
                 created_dt = datetime.datetime.fromisoformat(created_at)
@@ -299,8 +309,6 @@ class ElasticsearchClient:
         return {
             "batches": batches,
             "total": total_batches,
-            "page": page,
-            "page_size": page_size,
         }
 
     async def get_task_by_message_id(self, message_id: str) -> Dict[str, Any]:

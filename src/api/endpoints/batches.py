@@ -18,7 +18,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
 import logging
 import datetime
-from database.elastic_session import get_elasticsearch_client
+from database.elastic_session import ElasticsearchClient, get_elasticsearch_client
 
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
@@ -55,15 +55,11 @@ class BulkTaskResponse(BaseModel):
 
 class BatchListResponse(BaseModel):
     total: int
-    page: int
-    page_size: int
     batches: List[Batch]
 
 
 class BatchTasksResponse(BaseModel):
     total: int
-    page: int
-    page_size: int
     tasks: List[Task]
 
 
@@ -94,8 +90,7 @@ async def get_batch(batch_id: str, es_client=Depends(get_elasticsearch_client)):
         if not batch_stats:
             logger.info(f"No tasks found for batch_id {batch_id}")
             raise HTTPException(
-                status_code=404, 
-                detail=f"No tasks found for batch_id {batch_id}"
+                status_code=404, detail=f"No tasks found for batch_id {batch_id}"
             )
 
         # Calculate batch status
@@ -140,8 +135,7 @@ async def get_batch(batch_id: str, es_client=Depends(get_elasticsearch_client)):
     except Exception as e:
         logger.error(f"Failed to fetch status for batch {batch_id}: {str(e)}")
         raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to fetch bulk task status: {str(e)}"
+            status_code=500, detail=f"Failed to fetch bulk task status: {str(e)}"
         )
 
 
@@ -200,7 +194,7 @@ async def submit_bulk_tasks(
 async def list_batches(
     page: int = Query(1, gt=0),
     page_size: int = Query(50, gt=0, le=100),
-    es_client=Depends(get_elasticsearch_client),
+    es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
 ):
     logger.info(f"Listing batches - page: {page}, page_size: {page_size}")
     try:
@@ -211,8 +205,6 @@ async def list_batches(
         return BatchListResponse(
             batches=batches,
             total=result["total"],
-            page=result["page"],
-            page_size=result["page_size"],
         )
 
     except Exception as e:
@@ -230,17 +222,13 @@ async def list_batches(
 @router.get("/batches/{batch_id}/tasks", response_model=BatchTasksResponse)
 async def get_batch_tasks(
     batch_id: str,
-    page: int = Query(1, gt=0),
-    page_size: int = Query(50, gt=0, le=100),
-    es_client=Depends(get_elasticsearch_client),
+    es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
 ):
-    logger.info(
-        f"Fetching tasks for batch {batch_id} - page: {page}, page_size: {page_size}"
-    )
+    logger.info(f"Fetching tasks for batch {batch_id}")
     try:
-        result = await es_client.get_batch_tasks(batch_id, page, page_size)
+        result = await es_client.get_batch_tasks(batch_id)
 
-        if not result["tasks"] and page == 1:
+        if not result["tasks"]:
             raise HTTPException(
                 status_code=404, detail=f"No tasks found for batch_id {batch_id}"
             )
@@ -250,8 +238,6 @@ async def get_batch_tasks(
         return BatchTasksResponse(
             tasks=task_details,
             total=result["total"],
-            page=result["page"],
-            page_size=result["page_size"],
         )
 
     except HTTPException:
@@ -268,14 +254,11 @@ async def get_batch_tasks(
     reraise=True,
 )
 @router.delete("/batches/{batch_id}", status_code=204)
-async def delete_batch(batch_id: str, es_client=Depends(get_elasticsearch_client)):
+async def delete_batch(
+    batch_id: str, es_client: ElasticsearchClient = Depends(get_elasticsearch_client)
+):
     logger.info(f"Deleting batch {batch_id}")
     try:
-        # Check if batch exists
-        batch_stats = await es_client.get_batch_stats(batch_id)
-        if not batch_stats:
-            raise HTTPException(status_code=404, detail=f"Batch {batch_id} not found")
-
         # Delete all documents with the given batch_id
         await es_client.client.delete_by_query(
             index="events", body={"query": {"term": {"batch_id": batch_id}}}

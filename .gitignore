@@ -9,6 +9,7 @@ __pycache__/
 
 # Environment Variables
 .env
+.local.env
 
 # VSCode
 .vscode/

@@ -18,7 +18,6 @@ class Task(BaseModel):
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     duration: Optional[int]
-    queue_position: Optional[int]
     dataset: Optional[str]
     source: Optional[dict]
 

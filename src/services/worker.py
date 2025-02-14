@@ -123,7 +123,7 @@ class Worker:
 
                             message_id = str(uuid.uuid4())
                             # Ensure consistent JSON serialization with compact format
-                            body_json = json.dumps(task_data["body"], sort_keys=True, separators=(',', ':'))
+                            body_json = json.dumps(task_data["body"], sort_keys=True, separators=(",", ":"))
                             hasher = sha256()
                             hasher.update(body_json.encode('utf-8'))
                             body_hash = base64.b64encode(hasher.digest()).decode('utf-8')
@@ -148,6 +148,7 @@ class Worker:
                                     "message_id": message_id,
                                     "timestamp": timestamp,
                                     "payload": task_data,
+                                    "body_hash": body_hash,
                                     "batch_id": metadata.batch_id,
                                 }
                             )

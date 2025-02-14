@@ -303,7 +303,48 @@ class ElasticsearchClient:
             "page_size": page_size,
         }
 
-    # Add other helper methods as needed...
+    async def get_task_by_message_id(self, message_id: str) -> Dict[str, Any]:
+        """
+        Retrieve a task document by its message_id.
+        Returns the document's _source data if found, otherwise None.
+        """
+        query = {"query": {"term": {"message_id": message_id}}}
+        result = await self.client.search(index="events", body=query)
+        total_hits = (
+            result["hits"]["total"]["value"]
+            if isinstance(result["hits"]["total"], dict)
+            else result["hits"]["total"]
+        )
+        if total_hits == 0:
+            return None
+        return result["hits"]["hits"][0]["_source"]
+
+    async def count_pending_tasks_before(self, created_at: str) -> int:
+        """
+        Count the number of pending tasks created at or before the given timestamp.
+        Used for computing a task's queue position.
+        """
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"status": TaskStatus.PENDING.value}},
+                        {"range": {"created_at": {"lte": created_at}}},
+                    ]
+                }
+            }
+        }
+        result = await self.client.count(index="events", body=query)
+        return result.get("count", 0)
+
+    async def delete_task_by_message_id(self, message_id: str) -> int:
+        """
+        Delete a task document by its message_id.
+        Returns the number of documents deleted.
+        """
+        query = {"query": {"term": {"message_id": message_id}}}
+        result = await self.client.delete_by_query(index="events", body=query)
+        return result.get("deleted", 0)
 
 
 # Create a global instance

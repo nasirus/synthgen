@@ -1,10 +1,8 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
 use chrono::{DateTime, Utc};
 use elasticsearch::{
     http::transport::Transport, params::Refresh, Elasticsearch, SearchParts, UpdateParts,
 };
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 
 use crate::schemas::llm_response::{LLMResponse, Usage};
 use crate::schemas::task_status::TaskStatus;
@@ -26,13 +24,6 @@ impl DatabaseClient {
         let client = Elasticsearch::new(transport);
 
         Ok(DatabaseClient { client })
-    }
-
-    fn calculate_body_hash(&self, body: &Value) -> String {
-        let mut hasher = Sha256::new();
-        let json_str = serde_json::to_string(body).unwrap();
-        hasher.update(json_str.as_bytes());
-        STANDARD.encode(hasher.finalize())
     }
 
     pub async fn update_event_status(
@@ -80,10 +71,8 @@ impl DatabaseClient {
 
     pub async fn get_cached_completion(
         &self,
-        body: &Value,
+        body_hash: String,
     ) -> Result<Option<LLMResponse>, Box<dyn std::error::Error + Send + Sync>> {
-        let body_hash = self.calculate_body_hash(body);
-
         let query = json!({
             "query": {
                 "bool": {

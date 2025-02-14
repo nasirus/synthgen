@@ -60,10 +60,6 @@ services:
           cpus: '1'
           memory: 1024M
     environment:
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASS=guest
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
       - CONSUMER_ID=${CONSUMER_ID:-1}
     depends_on:
       rabbitmq:

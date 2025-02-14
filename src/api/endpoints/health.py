@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException
 import pika
-from database.session import pool
 from core.config import settings
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 from schemas.health_status import HealthStatus
+from database.elastic_session import get_elasticsearch_client
 
 router = APIRouter()
 USE_API_PREFIX = False  # This will keep the health check at /health
@@ -13,7 +13,7 @@ USE_API_PREFIX = False  # This will keep the health check at /health
 class ServiceStatus(BaseModel):
     api: HealthStatus = HealthStatus.HEALTHY
     rabbitmq: HealthStatus = HealthStatus.UNHEALTHY
-    postgres: HealthStatus = HealthStatus.UNHEALTHY
+    elasticsearch: HealthStatus = HealthStatus.UNHEALTHY
     queue_consumers: int = 0
     queue_messages: int = 0
 
@@ -52,30 +52,30 @@ async def health_check():
     except Exception as e:
         errors.append(f"RabbitMQ: {str(e)}")
 
-    # Check PostgreSQL
+    # Check Elasticsearch
     try:
-
         @retry(
             stop=stop_after_attempt(settings.MAX_RETRIES),
             wait=wait_exponential(multiplier=1, min=4, max=10),
             reraise=True,
         )
-        def check_db_connection():
-            with pool.connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT 1")
+        async def check_db_connection():
+            es_client = get_elasticsearch_client()
+            # Use the ping method to check ES health
+            if not await es_client.client.ping():
+                raise Exception("Elasticsearch cluster did not respond to ping")
 
-        check_db_connection()
-        services.postgres = HealthStatus.HEALTHY
+        await check_db_connection()
+        services.elasticsearch = HealthStatus.HEALTHY
     except Exception as e:
-        errors.append(f"PostgreSQL: {str(e)}")
+        errors.append(f"Elasticsearch: {str(e)}")
 
     # Determine overall status
     overall_status = (
         HealthStatus.HEALTHY
         if all(
             getattr(services, service) == HealthStatus.HEALTHY
-            for service in ["api", "rabbitmq", "postgres"]
+            for service in ["api", "rabbitmq", "elasticsearch"]
         )
         else HealthStatus.UNHEALTHY
     )

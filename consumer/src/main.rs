@@ -1,5 +1,5 @@
 use chrono::Utc;
-use config::{Config, ConfigError, File};
+use config::ConfigError;
 use consumer::db;
 use consumer::llm_wrapper;
 use consumer::schemas;
@@ -10,14 +10,13 @@ use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
+use std::env;
 
 #[derive(Debug, Deserialize, Clone)]
 struct Settings {
     site_url: String,
     site_name: String,
-    #[serde(default = "default_retry_attempts")]
     retry_attempts: u32,
-    #[serde(default = "default_base_delay_ms")]
     base_delay_ms: u64,
     database: DatabaseSettings,
     rabbitmq_host: String,
@@ -27,23 +26,38 @@ struct Settings {
     max_parallel_tasks: usize,
 }
 
-fn default_retry_attempts() -> u32 {
-    10
-}
-fn default_base_delay_ms() -> u64 {
-    10000
-}
-
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
-        let config = Config::builder()
-            .set_default("site_name", "Default Site")?
-            .add_source(File::with_name("config/default"))
-            .add_source(File::with_name("config/${APP_ENV}").required(false))
-            .add_source(config::Environment::with_prefix("APP"))
-            .build()?;
+        // Load environment variables
+        dotenv::dotenv().ok();
 
-        config.try_deserialize()
+        Ok(Settings {
+            site_url: env::var("SITE_URL").unwrap_or_else(|_| "https://your-site.com".to_string()),
+            site_name: env::var("SITE_NAME").unwrap_or_else(|_| "Your Site Name".to_string()),
+            retry_attempts: env::var("RETRY_ATTEMPTS")
+                .map(|v| v.parse().unwrap_or(10))
+                .unwrap_or(10),
+            base_delay_ms: env::var("BASE_DELAY_MS")
+                .map(|v| v.parse().unwrap_or(10000))
+                .unwrap_or(10000),
+            max_parallel_tasks: env::var("MAX_PARALLEL_TASKS")
+                .map(|v| v.parse().unwrap_or(300))
+                .unwrap_or(300),
+            rabbitmq_host: env::var("RABBITMQ_HOST").unwrap_or_else(|_| "rabbitmq".to_string()),
+            rabbitmq_port: env::var("RABBITMQ_PORT")
+                .map(|v| v.parse().unwrap_or(5672))
+                .unwrap_or(5672),
+            rabbitmq_user: env::var("RABBITMQ_USER").unwrap_or_else(|_| "guest".to_string()),
+            rabbitmq_pass: env::var("RABBITMQ_PASS").unwrap_or_else(|_| "guest".to_string()),
+            database: DatabaseSettings {
+                host: env::var("ELASTICSEARCH_HOST").unwrap_or_else(|_| "es01".to_string()),
+                port: env::var("ELASTICSEARCH_PORT")
+                    .map(|v| v.parse().unwrap_or(9200))
+                    .unwrap_or(9200),
+                user: env::var("ELASTICSEARCH_USER").unwrap_or_else(|_| "elastic".to_string()),
+                password: env::var("ELASTICSEARCH_PASSWORD").unwrap_or_else(|_| "elastic".to_string()),
+            },
+        })
     }
 }
 
@@ -189,8 +203,7 @@ async fn process_message(
     db_client: Arc<db::DatabaseClient>,
     delivery: lapin::message::Delivery,
 ) {
-    let data = delivery.data.clone();
-    let message_data: serde_json::Value = match serde_json::from_slice(&data) {
+    let message_data: serde_json::Value = match serde_json::from_slice(&delivery.data) {
         Ok(data) => data,
         Err(e) => {
             error!("Failed to parse message: {}", e);
@@ -204,6 +217,7 @@ async fn process_message(
 
     let message_id = message_data["message_id"].as_str().unwrap_or_default();
     let payload = message_data["payload"].clone();
+    let body_hash = message_data["body_hash"].as_str().unwrap_or_default();
     let started_at = Utc::now();
 
     info!("Processing message {}", message_id);
@@ -232,7 +246,8 @@ async fn process_message(
     }
 
     // Check cache
-    if let Ok(Some(cached_response)) = db_client.get_cached_completion(&payload["body"]).await {
+    if let Ok(Some(cached_response)) = db_client.get_cached_completion(body_hash.to_string()).await
+    {
         info!("Using cached response for message {}", message_id);
         if let Err(e) = db_client
             .update_event_status(

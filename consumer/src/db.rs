@@ -6,7 +6,6 @@ use elasticsearch::{
     http::transport::Transport, params::Refresh, Elasticsearch, SearchParts, UpdateParts,
 };
 use serde_json::{json, Value};
-use tracing::info;
 
 pub struct DatabaseClient {
     client: Elasticsearch,

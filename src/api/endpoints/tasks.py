@@ -1,7 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
-from schemas.task_status import TaskStatus
 from schemas.task import Task
 from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings

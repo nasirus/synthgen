@@ -220,52 +220,60 @@ async fn process_message(
     let payload = message_data["payload"].clone();
     let body_hash = message_data["body_hash"].as_str().unwrap_or_default();
     let started_at = Utc::now();
+    let use_cache = payload["use_cache"].as_bool().unwrap_or(false);
+    let track_progress = payload["track_progress"].as_bool().unwrap_or(false);
 
     info!("Processing message {}", message_id);
 
-    // Update status to PROCESSING
-    if let Err(e) = db_client
-        .update_event_status(
-            message_id.to_string(),
-            schemas::task_status::TaskStatus::Processing,
-            &schemas::llm_response::LLMResponse {
-                completions: serde_json::Value::Null,
-                cached: false,
-                attempt: 0,
-            },
-            started_at,
-        )
-        .await
-    {
-        error!("Failed to update status to PROCESSING: {}", e);
-        return;
-    }
-
-    // Check cache
-    if let Ok(Some(cached_response)) = db_client.get_cached_completion(body_hash.to_string()).await
-    {
-        info!("Using cached response for message {}", message_id);
+    // Update status to PROCESSING only if track_progress is true
+    if track_progress {
         if let Err(e) = db_client
             .update_event_status(
                 message_id.to_string(),
-                schemas::task_status::TaskStatus::Completed,
-                &cached_response,
+                schemas::task_status::TaskStatus::Processing,
+                &schemas::llm_response::LLMResponse {
+                    completions: serde_json::Value::Null,
+                    cached: false,
+                    attempt: 0,
+                },
                 started_at,
             )
             .await
         {
-            error!("Failed to update cached status: {}", e);
-            // Requeue if db update fails
-            if let Err(reject_err) = delivery.reject(BasicRejectOptions { requeue: true }).await {
-                error!("Failed to requeue message: {}", reject_err);
+            error!("Failed to update status to PROCESSING: {}", e);
+            return;
+        }
+    }
+
+    // Check cache only if use_cache is true
+    if use_cache {
+        if let Ok(Some(cached_response)) =
+            db_client.get_cached_completion(body_hash.to_string()).await
+        {
+            info!("Using cached response for message {}", message_id);
+            if let Err(e) = db_client
+                .update_event_status(
+                    message_id.to_string(),
+                    schemas::task_status::TaskStatus::Completed,
+                    &cached_response,
+                    started_at,
+                )
+                .await
+            {
+                error!("Failed to update cached status: {}", e);
+                // Requeue if db update fails
+                if let Err(reject_err) = delivery.reject(BasicRejectOptions { requeue: true }).await
+                {
+                    error!("Failed to requeue message: {}", reject_err);
+                }
+                return;
+            }
+            // Acknowledge message for successful cache hit
+            if let Err(ack_err) = delivery.ack(BasicAckOptions::default()).await {
+                error!("Failed to acknowledge message: {}", ack_err);
             }
             return;
         }
-        // Acknowledge message for successful cache hit
-        if let Err(ack_err) = delivery.ack(BasicAckOptions::default()).await {
-            error!("Failed to acknowledge message: {}", ack_err);
-        }
-        return;
     }
 
     let url = payload["url"].as_str().unwrap_or_default().to_string();

@@ -7,10 +7,10 @@ use consumer::settings::DatabaseSettings;
 use futures_lite::StreamExt;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::Deserialize;
+use std::env;
 use std::sync::Arc;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
-use std::env;
 
 #[derive(Debug, Deserialize, Clone)]
 struct Settings {
@@ -41,21 +41,22 @@ impl Settings {
                 .map(|v| v.parse().unwrap_or(10000))
                 .unwrap_or(10000),
             max_parallel_tasks: env::var("MAX_PARALLEL_TASKS")
-                .map(|v| v.parse().unwrap_or(300))
+                .map(|v| v.parse().unwrap_or(10))
                 .unwrap_or(300),
-            rabbitmq_host: env::var("RABBITMQ_HOST").unwrap_or_else(|_| "rabbitmq".to_string()),
+            rabbitmq_host: env::var("RABBITMQ_HOST").unwrap_or_else(|_| "localhost".to_string()),
             rabbitmq_port: env::var("RABBITMQ_PORT")
                 .map(|v| v.parse().unwrap_or(5672))
                 .unwrap_or(5672),
             rabbitmq_user: env::var("RABBITMQ_USER").unwrap_or_else(|_| "guest".to_string()),
             rabbitmq_pass: env::var("RABBITMQ_PASS").unwrap_or_else(|_| "guest".to_string()),
             database: DatabaseSettings {
-                host: env::var("ELASTICSEARCH_HOST").unwrap_or_else(|_| "es01".to_string()),
+                host: env::var("ELASTICSEARCH_HOST").unwrap_or_else(|_| "localhost".to_string()),
                 port: env::var("ELASTICSEARCH_PORT")
                     .map(|v| v.parse().unwrap_or(9200))
                     .unwrap_or(9200),
                 user: env::var("ELASTICSEARCH_USER").unwrap_or_else(|_| "elastic".to_string()),
-                password: env::var("ELASTICSEARCH_PASSWORD").unwrap_or_else(|_| "elastic".to_string()),
+                password: env::var("ELASTICSEARCH_PASSWORD")
+                    .unwrap_or_else(|_| "elastic".to_string()),
             },
         })
     }
@@ -228,12 +229,7 @@ async fn process_message(
             message_id.to_string(),
             schemas::task_status::TaskStatus::Processing,
             &schemas::llm_response::LLMResponse {
-                content: String::new(),
-                usage: schemas::llm_response::Usage {
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                    total_tokens: 0,
-                },
+                completions: serde_json::Value::Null,
                 cached: false,
                 attempt: 0,
             },
@@ -329,12 +325,7 @@ async fn process_message(
                     message_id.to_string(),
                     schemas::task_status::TaskStatus::Failed,
                     &schemas::llm_response::LLMResponse {
-                        content: format!("LLM request failed: {}", e),
-                        usage: schemas::llm_response::Usage {
-                            prompt_tokens: 0,
-                            completion_tokens: 0,
-                            total_tokens: 0,
-                        },
+                        completions: serde_json::Value::Null,
                         cached: false,
                         attempt: 0,
                     },

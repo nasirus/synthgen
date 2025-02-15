@@ -50,13 +50,11 @@ class ElasticsearchClient:
                             "started_at": {"type": "date"},
                             "completed_at": {"type": "date"},
                             "duration": {"type": "integer"},
-                            "prompt_tokens": {"type": "integer"},
-                            "completion_tokens": {"type": "integer"},
-                            "total_tokens": {"type": "integer"},
                             "cached": {"type": "boolean"},
                             "attempt": {"type": "integer"},
                             "dataset": {"type": "keyword"},
                             "source": {"type": "object"},
+                            "completions": {"type": "object"},
                         }
                     },
                 }
@@ -75,9 +73,24 @@ class ElasticsearchClient:
             "size": 0,
             "query": {"term": {"batch_id": batch_id}},
             "aggs": {
-                "batch_stats": {"stats": {"field": "total_tokens"}},
-                "prompt_stats": {"stats": {"field": "prompt_tokens"}},
-                "completion_stats": {"stats": {"field": "completion_tokens"}},
+                "batch_stats": {
+                    "filter": {"term": {"cached": False}},
+                    "aggs": {
+                        "stats": {"stats": {"field": "completions.usage.total_tokens"}}
+                    }
+                },
+                "prompt_stats": {
+                    "filter": {"term": {"cached": False}},
+                    "aggs": {
+                        "stats": {"stats": {"field": "completions.usage.prompt_tokens"}}
+                    }
+                },
+                "completion_stats": {
+                    "filter": {"term": {"cached": False}},
+                    "aggs": {
+                        "stats": {"stats": {"field": "completions.usage.completion_tokens"}}
+                    }
+                },
                 "status_counts": {"terms": {"field": "status"}},
                 "cached_count": {"filter": {"term": {"cached": True}}},
                 "time_stats": {"min": {"field": "created_at"}},
@@ -106,9 +119,24 @@ class ElasticsearchClient:
                     },
                     "aggs": {
                         "latest_created": {"max": {"field": "created_at"}},
-                        "batch_stats": {"stats": {"field": "total_tokens"}},
-                        "prompt_stats": {"stats": {"field": "prompt_tokens"}},
-                        "completion_stats": {"stats": {"field": "completion_tokens"}},
+                        "batch_stats": {
+                            "filter": {"term": {"cached": False}},
+                            "aggs": {
+                                "tokens": {"stats": {"field": "completions.usage.total_tokens"}}
+                            }
+                        },
+                        "prompt_stats": {
+                            "filter": {"term": {"cached": False}},
+                            "aggs": {
+                                "tokens": {"stats": {"field": "completions.usage.prompt_tokens"}}
+                            }
+                        },
+                        "completion_stats": {
+                            "filter": {"term": {"cached": False}},
+                            "aggs": {
+                                "tokens": {"stats": {"field": "completions.usage.completion_tokens"}}
+                            }
+                        },
                         "status_counts": {"terms": {"field": "status"}},
                         "cached_count": {"filter": {"term": {"cached": True}}},
                         "time_stats": {"min": {"field": "created_at"}},
@@ -127,27 +155,24 @@ class ElasticsearchClient:
         query = {
             "query": {"term": {"batch_id": batch_id}},
             "sort": [{"created_at": "desc"}],
-            "size": 1000  # Number of documents per scroll
+            "size": 1000,  # Number of documents per scroll
         }
 
         # Initialize scroll
         result = await self.client.search(
             index="events",
             body=query,
-            scroll="2m"  # Keep scroll context alive for 2 minutes
+            scroll="2m",  # Keep scroll context alive for 2 minutes
         )
-        
+
         scroll_id = result["_scroll_id"]
         all_docs = result["hits"]["hits"]
         total_documents = result["hits"]["total"]["value"]
-        
+
         try:
             # Keep scrolling until no more documents
             while len(result["hits"]["hits"]) > 0:
-                result = await self.client.scroll(
-                    scroll_id=scroll_id,
-                    scroll="2m"
-                )
+                result = await self.client.scroll(scroll_id=scroll_id, scroll="2m")
                 scroll_id = result["_scroll_id"]
                 all_docs.extend(result["hits"]["hits"])
 
@@ -155,29 +180,26 @@ class ElasticsearchClient:
             tasks = []
             for hit in all_docs:
                 source = hit["_source"]
-                tasks.append({
-                    "message_id": source["message_id"],
-                    "batch_id": source["batch_id"],
-                    "status": source["status"],
-                    "cached": source.get("cached", False),
-                    "body": source.get("body", {}),
-                    "result": source.get("result", {}),
-                    "created_at": source.get("created_at"),
-                    "started_at": source.get("started_at"),
-                    "completed_at": source.get("completed_at"),
-                    "duration": source.get("duration"),
-                    "total_tokens": source.get("total_tokens", 0),
-                    "prompt_tokens": source.get("prompt_tokens", 0),
-                    "completion_tokens": source.get("completion_tokens", 0),
-                    "dataset": source.get("dataset"),
-                    "source": source.get("source"),
-                })
+                tasks.append(
+                    {
+                        "message_id": source["message_id"],
+                        "batch_id": source["batch_id"],
+                        "status": source["status"],
+                        "cached": source.get("cached", False),
+                        "body": source.get("body", {}),
+                        "result": source.get("result", {}),
+                        "created_at": source.get("created_at"),
+                        "started_at": source.get("started_at"),
+                        "completed_at": source.get("completed_at"),
+                        "duration": source.get("duration"),
+                        "completions": source.get("completions", {}),
+                        "dataset": source.get("dataset"),
+                        "source": source.get("source"),
+                    }
+                )
 
-            return {
-                "tasks": tasks,
-                "total": total_documents
-            }
-                
+            return {"tasks": tasks, "total": total_documents}
+
         finally:
             # Clean up scroll context
             try:
@@ -230,18 +252,15 @@ class ElasticsearchClient:
             "pending_count": pending_count,
             "processing_count": processing_count,
             "cached_count": aggs["cached_count"]["doc_count"],
-            "total_tokens": aggs["batch_stats"]["sum"] or 0,
-            "prompt_tokens": aggs["prompt_stats"]["sum"] or 0,
-            "completion_tokens": aggs["completion_stats"]["sum"] or 0,
+            "total_tokens": aggs["batch_stats"]["stats"]["sum"] or 0,
+            "prompt_tokens": aggs["prompt_stats"]["stats"]["sum"] or 0,
+            "completion_tokens": aggs["completion_stats"]["stats"]["sum"] or 0,
         }
 
-    def _process_batch_list(
-        self, result: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _process_batch_list(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """Process raw Elasticsearch response for batch list."""
         aggs = result["aggregations"]
         all_batches = aggs["unique_batches"]["buckets"]
-
 
         total_batches = len(all_batches)
 
@@ -277,8 +296,16 @@ class ElasticsearchClient:
 
             # Calculate duration
             created_at = bucket["time_stats"].get("value_as_string")
-            completed_at = bucket["completed_stats"].get("value_as_string") if bucket["completed_stats"].get("value") is not None else None
-            started_at = bucket["started_stats"].get("value_as_string") if bucket["started_stats"].get("value") is not None else None
+            completed_at = (
+                bucket["completed_stats"].get("value_as_string")
+                if bucket["completed_stats"].get("value") is not None
+                else None
+            )
+            started_at = (
+                bucket["started_stats"].get("value_as_string")
+                if bucket["started_stats"].get("value") is not None
+                else None
+            )
 
             duration = None
             if created_at and completed_at:
@@ -300,9 +327,9 @@ class ElasticsearchClient:
                     "pending_tasks": pending_count,
                     "processing_tasks": processing_count,
                     "cached_tasks": bucket["cached_count"]["doc_count"],
-                    "total_tokens": bucket["batch_stats"]["sum"] or 0,
-                    "prompt_tokens": bucket["prompt_stats"]["sum"] or 0,
-                    "completion_tokens": bucket["completion_stats"]["sum"] or 0,
+                    "total_tokens": bucket["batch_stats"]["tokens"]["sum"] or 0,
+                    "prompt_tokens": bucket["prompt_stats"]["tokens"]["sum"] or 0,
+                    "completion_tokens": bucket["completion_stats"]["tokens"]["sum"] or 0,
                 }
             )
 

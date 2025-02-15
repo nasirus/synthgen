@@ -83,7 +83,9 @@ class TaskListSubmission(BaseModel):
     reraise=True,
 )
 @router.get("/batches/{batch_id}", response_model=Batch)
-async def get_batch(batch_id: str, es_client=Depends(get_elasticsearch_client)):
+async def get_batch(
+    batch_id: str, es_client: ElasticsearchClient = Depends(get_elasticsearch_client)
+):
     logger.info(f"Fetching status for batch {batch_id}")
     try:
         batch_stats = await es_client.get_batch_stats(batch_id)

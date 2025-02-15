@@ -5,7 +5,7 @@ from schemas.task_status import TaskStatus
 from schemas.task import Task
 from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
-from database.elastic_session import get_elasticsearch_client
+from database.elastic_session import ElasticsearchClient, get_elasticsearch_client
 
 router = APIRouter()
 USE_API_PREFIX = True
@@ -24,18 +24,15 @@ class TaskListResponse(BaseModel):
     reraise=True,
 )
 @router.get("/tasks/{message_id}", response_model=Task)
-async def get_task(message_id: str, es_client=Depends(get_elasticsearch_client)):
+async def get_task(
+    message_id: str, es_client: ElasticsearchClient = Depends(get_elasticsearch_client)
+):
     try:
         event = await es_client.get_task_by_message_id(message_id)
         if not event:
             raise HTTPException(
                 status_code=404, detail=f"Task with message_id {message_id} not found"
             )
-        if event.get("status") == TaskStatus.PENDING.value:
-            queue_position = await es_client.count_pending_tasks_before(
-                event["created_at"]
-            )
-            event["queue_position"] = queue_position
         return Task(**event)
     except HTTPException:
         raise

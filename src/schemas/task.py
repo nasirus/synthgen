@@ -9,10 +9,7 @@ class Task(BaseModel):
     batch_id: Optional[str]
     status: TaskStatus
     body: Optional[dict]
-    result: Optional[dict]
-    prompt_tokens: Optional[int]
-    completion_tokens: Optional[int]
-    total_tokens: Optional[int]
+    completions: Optional[dict]
     cached: bool
     created_at: datetime
     started_at: Optional[datetime]

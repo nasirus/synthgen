@@ -1,12 +1,12 @@
+use crate::schemas::llm_response::LLMResponse;
+use crate::schemas::task_status::TaskStatus;
+use crate::settings::DatabaseSettings;
 use chrono::{DateTime, Utc};
 use elasticsearch::{
     http::transport::Transport, params::Refresh, Elasticsearch, SearchParts, UpdateParts,
 };
 use serde_json::{json, Value};
-
-use crate::schemas::llm_response::{LLMResponse, Usage};
-use crate::schemas::task_status::TaskStatus;
-use crate::settings::DatabaseSettings;
+use tracing::info;
 
 pub struct DatabaseClient {
     client: Elasticsearch,
@@ -44,14 +44,9 @@ impl DatabaseClient {
                 "started_at": started_at,
                 "status": status.as_str(),
                 "duration": duration,
-                "result": {
-                    "completion": llm_response.content
-                },
-                "prompt_tokens": llm_response.usage.prompt_tokens,
-                "completion_tokens": llm_response.usage.completion_tokens,
-                "total_tokens": llm_response.usage.total_tokens,
                 "cached": llm_response.cached,
-                "attempt": llm_response.attempt
+                "attempt": llm_response.attempt,
+                "completions": llm_response.completions
             }
         });
 
@@ -83,7 +78,6 @@ impl DatabaseClient {
                 }
             },
             "size": 1,
-            "_source": ["result"]
         });
 
         let response = self
@@ -99,14 +93,9 @@ impl DatabaseClient {
             .as_array()
             .and_then(|hits| hits.first())
         {
-            if let Some(completion) = hit["_source"]["result"]["completion"].as_str() {
+            if let Some(completions) = hit["_source"]["completions"].as_object() {
                 return Ok(Some(LLMResponse {
-                    content: completion.to_string(),
-                    usage: Usage {
-                        prompt_tokens: 0,
-                        completion_tokens: 0,
-                        total_tokens: 0,
-                    },
+                    completions: Value::Object(completions.clone()),
                     cached: true,
                     attempt: 0,
                 }));

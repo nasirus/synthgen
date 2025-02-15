@@ -1,35 +1,11 @@
-use crate::schemas::llm_response::{LLMResponse, Usage};
-use http;
+use crate::schemas::llm_response::LLMResponse;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
-
-#[derive(Serialize, Clone)]
-pub struct Message {
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct ChatResponse {
-    choices: Vec<Choice>,
-    usage: Usage,
-}
-
-#[derive(Debug, Deserialize)]
-struct Choice {
-    message: AssistantMessage,
-}
-
-#[derive(Debug, Deserialize)]
-struct AssistantMessage {
-    content: String,
-}
 
 #[derive(Clone)]
 pub struct LLMClient {
@@ -117,20 +93,10 @@ pub async fn call_llm(
             return Err(response.error_for_status().unwrap_err());
         }
 
-        let chat_response: ChatResponse = response.json().await?;
-        if chat_response.choices.is_empty() {
-            let response = http::Response::builder()
-                .status(reqwest::StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Vec::new())
-                .unwrap();
-            return Err(reqwest::Response::from(response)
-                .error_for_status()
-                .unwrap_err());
-        }
+        let raw_response: Value = response.json().await?;
 
         Ok(LLMResponse {
-            content: chat_response.choices[0].message.content.clone(),
-            usage: chat_response.usage,
+            completions: raw_response,
             cached: false,
             attempt: current_attempt,
         })

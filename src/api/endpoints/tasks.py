@@ -18,7 +18,7 @@ class TaskListResponse(BaseModel):
 
 
 @retry(
-    stop=stop_after_attempt(settings.MAX_RETRIES),
+    stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
@@ -42,7 +42,7 @@ async def get_task(
 
 
 @retry(
-    stop=stop_after_attempt(settings.MAX_RETRIES),
+    stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )

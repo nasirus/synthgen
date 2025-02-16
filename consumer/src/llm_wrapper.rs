@@ -29,10 +29,11 @@ pub async fn call_llm(
     site_name: String,
     retry_attempts: u32,
     base_delay_ms: u64,
+    max_delay_secs: u64,
 ) -> Result<LLMResponse, Box<dyn std::error::Error + Send + Sync>> {
     let retry_strategy = ExponentialBackoff::from_millis(base_delay_ms)
         .factor(2)
-        .max_delay(Duration::from_secs(60))
+        .max_delay(Duration::from_secs(max_delay_secs))
         .map(jitter)
         .take(retry_attempts as usize);
 

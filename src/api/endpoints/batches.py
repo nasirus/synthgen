@@ -78,7 +78,7 @@ class TaskListSubmission(BaseModel):
 
 
 @retry(
-    stop=stop_after_attempt(settings.MAX_RETRIES),
+    stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
@@ -188,7 +188,7 @@ async def submit_bulk_tasks(
 
 
 @retry(
-    stop=stop_after_attempt(settings.MAX_RETRIES),
+    stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
@@ -217,23 +217,23 @@ async def list_batches(
 
 
 @retry(
-    stop=stop_after_attempt(settings.MAX_RETRIES),
+    stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
 @router.get("/batches/{batch_id}/tasks", response_model=BatchTasksResponse)
 async def get_batch_tasks(
     batch_id: str,
+    task_status: TaskStatus = Query(TaskStatus.COMPLETED),
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
 ):
     logger.info(f"Fetching tasks for batch {batch_id}")
     try:
-        result = await es_client.get_batch_tasks(batch_id)
+        result = await es_client.get_batch_tasks(batch_id, task_status)
 
         if not result["tasks"]:
-            raise HTTPException(
-                status_code=404, detail=f"No tasks found for batch_id {batch_id}"
-            )
+            # Return an empty result instead of a 404 error
+            return BatchTasksResponse(tasks=[], total=0)
 
         task_details = [Task(**task) for task in result["tasks"]]
 
@@ -251,7 +251,7 @@ async def get_batch_tasks(
 
 
 @retry(
-    stop=stop_after_attempt(settings.MAX_RETRIES),
+    stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )

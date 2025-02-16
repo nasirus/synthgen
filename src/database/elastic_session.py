@@ -77,25 +77,28 @@ class ElasticsearchClient:
                     "filter": {"term": {"cached": False}},
                     "aggs": {
                         "stats": {"stats": {"field": "completions.usage.total_tokens"}}
-                    }
+                    },
                 },
                 "prompt_stats": {
                     "filter": {"term": {"cached": False}},
                     "aggs": {
                         "stats": {"stats": {"field": "completions.usage.prompt_tokens"}}
-                    }
+                    },
                 },
                 "completion_stats": {
                     "filter": {"term": {"cached": False}},
                     "aggs": {
-                        "stats": {"stats": {"field": "completions.usage.completion_tokens"}}
-                    }
+                        "stats": {
+                            "stats": {"field": "completions.usage.completion_tokens"}
+                        }
+                    },
                 },
                 "status_counts": {"terms": {"field": "status"}},
                 "cached_count": {"filter": {"term": {"cached": True}}},
                 "time_stats": {"min": {"field": "created_at"}},
                 "started_stats": {"min": {"field": "started_at"}},
                 "completed_stats": {"max": {"field": "completed_at"}},
+                "total_tasks": {"value_count": {"field": "message_id"}},
             },
         }
 
@@ -122,20 +125,30 @@ class ElasticsearchClient:
                         "batch_stats": {
                             "filter": {"term": {"cached": False}},
                             "aggs": {
-                                "tokens": {"stats": {"field": "completions.usage.total_tokens"}}
-                            }
+                                "tokens": {
+                                    "stats": {"field": "completions.usage.total_tokens"}
+                                }
+                            },
                         },
                         "prompt_stats": {
                             "filter": {"term": {"cached": False}},
                             "aggs": {
-                                "tokens": {"stats": {"field": "completions.usage.prompt_tokens"}}
-                            }
+                                "tokens": {
+                                    "stats": {
+                                        "field": "completions.usage.prompt_tokens"
+                                    }
+                                }
+                            },
                         },
                         "completion_stats": {
                             "filter": {"term": {"cached": False}},
                             "aggs": {
-                                "tokens": {"stats": {"field": "completions.usage.completion_tokens"}}
-                            }
+                                "tokens": {
+                                    "stats": {
+                                        "field": "completions.usage.completion_tokens"
+                                    }
+                                }
+                            },
                         },
                         "status_counts": {"terms": {"field": "status"}},
                         "cached_count": {"filter": {"term": {"cached": True}}},
@@ -150,10 +163,19 @@ class ElasticsearchClient:
         result = await self.client.search(index="events", body=query)
         return self._process_batch_list(result)
 
-    async def get_batch_tasks(self, batch_id: str) -> Dict[str, Any]:
+    async def get_batch_tasks(
+        self, batch_id: str, task_status: TaskStatus = TaskStatus.COMPLETED
+    ) -> Dict[str, Any]:
         """Get all tasks for a specific batch using scroll API."""
         query = {
-            "query": {"term": {"batch_id": batch_id}},
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"batch_id": batch_id}},
+                        {"term": {"status": task_status.value}},
+                    ]
+                }
+            },
             "sort": [{"created_at": "desc"}],
             "size": 1000,  # Number of documents per scroll
         }
@@ -162,7 +184,7 @@ class ElasticsearchClient:
         result = await self.client.search(
             index="events",
             body=query,
-            scroll="2m",  # Keep scroll context alive for 2 minutes
+            scroll="60m",  # Keep scroll context alive for 60 minutes
         )
 
         scroll_id = result["_scroll_id"]
@@ -220,14 +242,23 @@ class ElasticsearchClient:
         completed_count = status_buckets.get("COMPLETED", 0)
         failed_count = status_buckets.get("FAILED", 0)
         processing_count = status_buckets.get("PROCESSING", 0)
-        total_count = result["hits"]["total"]["value"]
+        total_count = aggs["total_tasks"]["value"]
         pending_count = total_count - (
             completed_count + failed_count + processing_count
         )
 
         # Calculate duration
-        created_at = aggs["time_stats"]["value_as_string"]
-        completed_at = aggs["completed_stats"]["value_as_string"]
+        created_at = (
+            aggs["time_stats"].get("value_as_string")
+            if aggs["time_stats"].get("value") is not None
+            else None
+        )
+        completed_at = (
+            aggs["completed_stats"].get("value_as_string")
+            if aggs["completed_stats"].get("value") is not None
+            else None
+        )
+
         started_at = (
             aggs["started_stats"].get("value_as_string")
             if aggs["started_stats"].get("value") is not None
@@ -329,7 +360,8 @@ class ElasticsearchClient:
                     "cached_tasks": bucket["cached_count"]["doc_count"],
                     "total_tokens": bucket["batch_stats"]["tokens"]["sum"] or 0,
                     "prompt_tokens": bucket["prompt_stats"]["tokens"]["sum"] or 0,
-                    "completion_tokens": bucket["completion_stats"]["tokens"]["sum"] or 0,
+                    "completion_tokens": bucket["completion_stats"]["tokens"]["sum"]
+                    or 0,
                 }
             )
 

@@ -40,6 +40,7 @@ class Worker:
         self.logger = logging.getLogger(__name__)
         self.setup_logging()
         self.es_client = get_elasticsearch_client()
+        self.prefetch_count = 1
 
     def setup_logging(self):
         """Configure logging for the worker."""
@@ -235,7 +236,9 @@ class Worker:
         self.logger.info("Starting worker...")
         try:
             await self.rabbitmq_handler.consume_messages(
-                queue_name="data_generation_batch", callback=self.process_message
+                queue_name="data_generation_batch", 
+                callback=self.process_message,
+                prefetch_count=self.prefetch_count
             )
         except Exception as e:
             await asyncio.sleep(5)

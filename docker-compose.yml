@@ -10,6 +10,8 @@ services:
     ports:
       - "5672:5672"   # RabbitMQ default port
       - "15672:15672" # RabbitMQ management interface port
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
       interval: 30s
@@ -105,15 +107,6 @@ services:
         limits:
           cpus: '1'
           memory: 1024M
-    environment:
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASS=guest
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
-      - MINIO_HOST=minio
-      - MINIO_PORT=9000
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -155,6 +148,7 @@ services:
 volumes:
   minio_data:
   elasticsearch_data:
+  rabbitmq_data:
 
 # Add networks configuration at the bottom of the file
 networks:

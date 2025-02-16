@@ -24,6 +24,7 @@ struct Settings {
     rabbitmq_user: String,
     rabbitmq_pass: String,
     max_parallel_tasks: usize,
+    max_delay_secs: u64,
 }
 
 impl Settings {
@@ -40,6 +41,9 @@ impl Settings {
             base_delay_ms: env::var("BASE_DELAY_MS")
                 .map(|v| v.parse().unwrap_or(10000))
                 .unwrap_or(10000),
+            max_delay_secs: env::var("MAX_DELAY_SECS")
+                .map(|v| v.parse().unwrap_or(300))
+                .unwrap_or(300),
             max_parallel_tasks: env::var("MAX_PARALLEL_TASKS")
                 .map(|v| v.parse().unwrap_or(10))
                 .unwrap_or(300),
@@ -289,6 +293,7 @@ async fn process_message(
         settings.site_name.clone(),
         settings.retry_attempts,
         settings.base_delay_ms,
+        settings.max_delay_secs,
     )
     .await
     {

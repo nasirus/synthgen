@@ -5,7 +5,6 @@ from schemas.task_status import TaskStatus
 from aio_pika import connect_robust, Message, DeliveryMode
 from core.config import settings
 import logging
-import aio_pika
 from database.elastic_session import es_client
 
 # Create a logger instance at module level
@@ -52,10 +51,24 @@ class RabbitMQHandler:
                 password=settings.RABBITMQ_PASS,
             )
             self.channel = await self.connection.channel()
-            # Declare queues
-            await self.channel.declare_queue(name="data_generation_tasks", durable=True)
+            # Declare queues with additional parameters
+            await self.channel.declare_queue(
+                name="data_generation_tasks",
+                durable=True,
+                auto_delete=False,
+                arguments={
+                    'x-queue-type': 'classic'
+                }
+            )
             logger.info("Declared data_generation_tasks queue")
-            await self.channel.declare_queue(name="data_generation_batch", durable=True)
+            await self.channel.declare_queue(
+                name="data_generation_batch",
+                durable=True,
+                auto_delete=False,
+                arguments={
+                    'x-queue-type': 'classic'
+                }
+            )
             logger.info("Declared data_generation_batch queue")
 
     def normalize_payload(self, payload):
@@ -83,9 +96,23 @@ class RabbitMQHandler:
         )
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
-        channel.queue_declare(queue="data_generation_tasks", durable=True)
+        channel.queue_declare(
+            queue="data_generation_tasks",
+            durable=True,
+            auto_delete=False,
+            arguments={
+                'x-queue-type': 'classic'
+            }
+        )
         logger.info("Declared data_generation_tasks queue")
-        channel.queue_declare(queue="data_generation_batch", durable=True)
+        channel.queue_declare(
+            queue="data_generation_batch",
+            durable=True,
+            auto_delete=False,
+            arguments={
+                'x-queue-type': 'classic'
+            }
+        )
         logger.info("Declared data_generation_batch queue")
         connection.close()
 
@@ -145,29 +172,20 @@ class RabbitMQHandler:
         except Exception:
             raise
 
-    async def consume_messages(self, queue_name: str, callback):
+    async def consume_messages(self, queue_name: str, callback, prefetch_count: int = 1):
         """
-        Consumes messages from the specified queue and processes them using the callback.
-
+        Consume messages from a specified queue.
+        
         Args:
             queue_name (str): Name of the queue to consume from
-            callback (callable): Async callback function to process the message
+            callback: Callback function to process messages
+            prefetch_count (int): Number of messages to prefetch (default: 1)
         """
-        if not self.connection or self.connection.is_closed:
-            self.connection = await aio_pika.connect_robust(
-                host=settings.RABBITMQ_HOST,
-                port=settings.RABBITMQ_PORT,
-                login=settings.RABBITMQ_USER,
-                password=settings.RABBITMQ_PASS,
-                timeout=30,
-            )
-
-        if not self.channel or self.channel.is_closed:
-            self.channel = await self.connection.channel()
-            await self.channel.set_qos(prefetch_count=1)
-
+        channel = await self.connection.channel()
+        await channel.set_qos(prefetch_count=prefetch_count)
+        
         # Declare the queue
-        queue = await self.channel.declare_queue(queue_name, durable=True)
+        queue = await channel.declare_queue(queue_name, durable=True)
 
         async with queue.iterator() as queue_iter:
             async for message in queue_iter:

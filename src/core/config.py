@@ -31,10 +31,7 @@ class Settings:
     MAX_PARALLEL_TASKS: int = int(os.getenv("MAX_PARALLEL_TASKS", 200))
 
     # Maximum number of retries
-    MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", 3))
-
-    # LLM timeout
-    LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", 300))
+    RETRY_ATTEMPTS: int = int(os.getenv("RETRY_ATTEMPTS", 3))
 
     # Chunk size for bulk inserts
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", 1000))

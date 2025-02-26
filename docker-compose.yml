@@ -21,6 +21,8 @@ services:
       - ./src/.local.env
     networks:
       - synthetic-data-network
+    environment:
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit consumer_timeout 3600000
 
   api:
     build: .

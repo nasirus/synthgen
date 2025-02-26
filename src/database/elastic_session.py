@@ -163,10 +163,37 @@ class ElasticsearchClient:
         result = await self.client.search(index="events", body=query)
         return self._process_batch_list(result)
 
+    def _process_hits(self, hits: list) -> list:
+        """Helper method to process Elasticsearch hits into task dicts."""
+        tasks = []
+        for hit in hits:
+            source = hit["_source"]
+            tasks.append(
+                {
+                    "message_id": source["message_id"],
+                    "batch_id": source["batch_id"],
+                    "status": source["status"],
+                    "cached": source.get("cached", False),
+                    "body": source.get("body", {}),
+                    "result": source.get("result", {}),
+                    "created_at": source.get("created_at"),
+                    "started_at": source.get("started_at"),
+                    "completed_at": source.get("completed_at"),
+                    "duration": source.get("duration"),
+                    "completions": source.get("completions", {}),
+                    "dataset": source.get("dataset"),
+                    "source": source.get("source"),
+                }
+            )
+        return tasks
+
     async def get_batch_tasks(
         self, batch_id: str, task_status: TaskStatus = TaskStatus.COMPLETED
-    ) -> Dict[str, Any]:
-        """Get all tasks for a specific batch using scroll API."""
+    ):
+        """
+        Stream tasks for a specific batch using the scroll API.
+        Yields each chunk (a dict containing a list of tasks and total count) as soon as it is received.
+        """
         query = {
             "query": {
                 "bool": {
@@ -177,7 +204,7 @@ class ElasticsearchClient:
                 }
             },
             "sort": [{"created_at": "desc"}],
-            "size": 1000,  # Number of documents per scroll
+            "size": 10000,  # Number of documents per scroll
         }
 
         # Initialize scroll
@@ -187,43 +214,25 @@ class ElasticsearchClient:
             scroll="60m",  # Keep scroll context alive for 60 minutes
         )
 
-        scroll_id = result["_scroll_id"]
-        all_docs = result["hits"]["hits"]
         total_documents = result["hits"]["total"]["value"]
+        scroll_id = result.get("_scroll_id")
+
+        # Process and yield the first chunk of tasks
+        tasks_chunk = self._process_hits(result["hits"]["hits"])
+        yield {"tasks": tasks_chunk, "total": total_documents}
 
         try:
-            # Keep scrolling until no more documents
-            while len(result["hits"]["hits"]) > 0:
+            # Continue scrolling until no more hits found
+            while True:
                 result = await self.client.scroll(scroll_id=scroll_id, scroll="2m")
-                scroll_id = result["_scroll_id"]
-                all_docs.extend(result["hits"]["hits"])
-
-            # Process all documents
-            tasks = []
-            for hit in all_docs:
-                source = hit["_source"]
-                tasks.append(
-                    {
-                        "message_id": source["message_id"],
-                        "batch_id": source["batch_id"],
-                        "status": source["status"],
-                        "cached": source.get("cached", False),
-                        "body": source.get("body", {}),
-                        "result": source.get("result", {}),
-                        "created_at": source.get("created_at"),
-                        "started_at": source.get("started_at"),
-                        "completed_at": source.get("completed_at"),
-                        "duration": source.get("duration"),
-                        "completions": source.get("completions", {}),
-                        "dataset": source.get("dataset"),
-                        "source": source.get("source"),
-                    }
-                )
-
-            return {"tasks": tasks, "total": total_documents}
-
+                scroll_id = result.get("_scroll_id")
+                hits = result["hits"]["hits"]
+                if not hits:
+                    break
+                tasks_chunk = self._process_hits(hits)
+                yield {"tasks": tasks_chunk, "total": total_documents}
         finally:
-            # Clean up scroll context
+            # Always try to clear the scroll context to free resources
             try:
                 await self.client.clear_scroll(scroll_id=scroll_id)
             except Exception as e:

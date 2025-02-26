@@ -28,7 +28,7 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 2048M
+          memory: 1024M
     container_name: synthetic-data-api
     ports:
       - "8002:8000"
@@ -128,7 +128,7 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 1024M
+          memory: 2048M
     ports:
       - "9200:9200"
     environment:

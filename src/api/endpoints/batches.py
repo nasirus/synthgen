@@ -6,6 +6,7 @@ from fastapi import (
     File,
     Query,
 )
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from schemas.batch import Batch
 from schemas.task import Task
@@ -18,6 +19,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
 import logging
 import datetime
+import json
 from database.elastic_session import ElasticsearchClient, get_elasticsearch_client
 
 router = APIRouter()
@@ -221,33 +223,26 @@ async def list_batches(
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
-@router.get("/batches/{batch_id}/tasks", response_model=BatchTasksResponse)
+@router.get("/batches/{batch_id}/tasks")
 async def get_batch_tasks(
     batch_id: str,
     task_status: TaskStatus = Query(TaskStatus.COMPLETED),
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
 ):
-    logger.info(f"Fetching tasks for batch {batch_id}")
-    try:
-        result = await es_client.get_batch_tasks(batch_id, task_status)
+    """
+    Stream tasks for a specific batch.
+    Instead of collecting all tasks in memory, tasks are streamed in chunks as they are received
+    from Elasticsearch using the scroll API.
+    (The endpoint now returns newline-delimited JSON; adjust the media type or stream format as needed.)
+    """
+    logger.info(f"Streaming tasks for batch {batch_id}")
 
-        if not result["tasks"]:
-            # Return an empty result instead of a 404 error
-            return BatchTasksResponse(tasks=[], total=0)
+    async def task_streamer():
+        async for chunk in es_client.get_batch_tasks(batch_id, task_status):
+            # Each yielded chunk is a dict containing {"tasks": [...], "total": ...}
+            yield json.dumps(chunk) + "\n"
 
-        task_details = [Task(**task) for task in result["tasks"]]
-
-        return BatchTasksResponse(
-            tasks=task_details,
-            total=result["total"],
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to fetch batch tasks: {str(e)}"
-        )
+    return StreamingResponse(task_streamer(), media_type="application/x-ndjson")
 
 
 @retry(

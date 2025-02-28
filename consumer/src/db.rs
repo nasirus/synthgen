@@ -33,9 +33,15 @@ impl DatabaseClient {
         started_at: DateTime<Utc>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let completed_at = Utc::now();
-        let duration = completed_at
-            .signed_duration_since(started_at)
-            .num_milliseconds() as i32;
+        let duration = if llm_response.completions != Value::Null {
+            llm_response.completed_at
+                .signed_duration_since(llm_response.started_at)
+                .num_milliseconds() as i32
+        } else {
+            completed_at
+                .signed_duration_since(started_at)
+                .num_milliseconds() as i32
+        };
 
         let doc = json!({
             "doc": {
@@ -97,6 +103,14 @@ impl DatabaseClient {
                     completions: Value::Object(completions.clone()),
                     cached: true,
                     attempt: 0,
+                    started_at: hit["_source"]["started_at"]
+                        .as_str()
+                        .and_then(|s| s.parse::<DateTime<Utc>>().ok())
+                        .unwrap_or_else(Utc::now),
+                    completed_at: hit["_source"]["completed_at"]
+                        .as_str()
+                        .and_then(|s| s.parse::<DateTime<Utc>>().ok())
+                        .unwrap_or_else(Utc::now),
                 }));
             }
         }

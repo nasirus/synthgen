@@ -7,6 +7,7 @@ use std::time::Duration;
 use tokio_retry2::strategy::jitter;
 use tokio_retry2::Retry;
 use tokio_retry2::RetryError;
+use chrono::Utc;
 
 #[derive(Debug)]
 struct LLMError(String);
@@ -53,6 +54,8 @@ pub async fn call_llm(
 
     let result = Retry::spawn(retry_strategy, || async {
         let current_attempt = attempt.fetch_add(1, Ordering::SeqCst);
+        let attempt_started_at = Utc::now();
+        
         tracing::debug!(
             "LLM request attempt {}/{}",
             current_attempt + 1,
@@ -250,10 +253,22 @@ pub async fn call_llm(
                     }
                 }
 
+                let attempt_completed_at = Utc::now();
+                let duration_ms = attempt_completed_at.signed_duration_since(attempt_started_at).num_milliseconds();
+                
+                tracing::info!(
+                    "LLM request attempt {}/{} completed successfully in {}ms",
+                    current_attempt + 1,
+                    retry_attempts,
+                    duration_ms
+                );
+
                 Ok(LLMResponse {
                     completions: raw_response,
                     cached: false,
                     attempt: current_attempt,
+                    started_at: attempt_started_at,
+                    completed_at: attempt_completed_at,
                 })
             }
         }

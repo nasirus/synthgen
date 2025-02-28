@@ -4,8 +4,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 1024M
+          cpus: '0.2'
+          memory: 512M
     container_name: rabbitmq
     ports:
       - "5672:5672"   # RabbitMQ default port
@@ -29,8 +29,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1024M
+          cpus: '0.1'
+          memory: 128M
     container_name: synthetic-data-api
     ports:
       - "8002:8000"
@@ -57,8 +57,8 @@ services:
       replicas: ${NUM_CONSUMERS:-1}
       resources:
         limits:
-          cpus: '1'
-          memory: 1024M
+          cpus: '0.1'
+          memory: 128M
     environment:
       - CONSUMER_ID=${CONSUMER_ID:-1}
     depends_on:
@@ -78,8 +78,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1024M
+          cpus: '0.1'
+          memory: 128M
     container_name: minio
     ports:
       - "9000:9000"   # API port
@@ -107,8 +107,8 @@ services:
       replicas: ${NUM_WORKERS:-1}
       resources:
         limits:
-          cpus: '1'
-          memory: 1024M
+          cpus: '0.1'
+          memory: 128M
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -129,8 +129,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 2048M
+          cpus: '0.5'
+          memory: 1024M
     ports:
       - "9200:9200"
     environment:
@@ -146,6 +146,24 @@ services:
       retries: 3
     networks:
       - synthetic-data-network
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: --config /app/config.yaml --detailed_debug
+    networks:
+      - synthetic-data-network
+    env_file:
+      - ./src/.local.env      
 
 volumes:
   minio_data:

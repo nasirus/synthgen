@@ -223,7 +223,7 @@ async fn process_message(
     let message_id = message_data["message_id"].as_str().unwrap_or_default();
     let payload = message_data["payload"].clone();
     let body_hash = message_data["body_hash"].as_str().unwrap_or_default();
-    let started_at = Utc::now();
+    let processing_started_at = Utc::now();
     let use_cache = payload["use_cache"].as_bool().unwrap_or(false);
     let track_progress = payload["track_progress"].as_bool().unwrap_or(false);
 
@@ -239,8 +239,10 @@ async fn process_message(
                     completions: serde_json::Value::Null,
                     cached: false,
                     attempt: 0,
+                    started_at: processing_started_at,
+                    completed_at: processing_started_at,
                 },
-                started_at,
+                processing_started_at,
             )
             .await
         {
@@ -260,7 +262,7 @@ async fn process_message(
                     message_id.to_string(),
                     schemas::task_status::TaskStatus::Completed,
                     &cached_response,
-                    started_at,
+                    processing_started_at,
                 )
                 .await
             {
@@ -303,18 +305,27 @@ async fn process_message(
                     message_id.to_string(),
                     schemas::task_status::TaskStatus::Completed,
                     &response,
-                    started_at,
+                    processing_started_at,
                 )
                 .await
             {
                 Ok(_) => {
+                    // Use the timing information from the LLMResponse
+                    let llm_duration_ms = response.completed_at
+                        .signed_duration_since(response.started_at)
+                        .num_milliseconds();
+                    
+                    let total_duration_ms = Utc::now()
+                        .signed_duration_since(processing_started_at)
+                        .num_milliseconds();
+                    
                     info!(
-                        "Successfully completed message {} in {}ms",
+                        "Successfully completed message {} - LLM call: {}ms, Total processing: {}ms",
                         message_id,
-                        Utc::now()
-                            .signed_duration_since(started_at)
-                            .num_milliseconds()
+                        llm_duration_ms,
+                        total_duration_ms
                     );
+                    
                     // Acknowledge successful processing
                     if let Err(ack_err) = delivery.ack(BasicAckOptions::default()).await {
                         error!("Failed to acknowledge message: {}", ack_err);
@@ -333,6 +344,7 @@ async fn process_message(
         }
         Err(e) => {
             error!("LLM request failed: {}", e);
+            let now = Utc::now();
             if let Err(db_err) = db_client
                 .update_event_status(
                     message_id.to_string(),
@@ -341,8 +353,10 @@ async fn process_message(
                         completions: serde_json::Value::Null,
                         cached: false,
                         attempt: 0,
+                        started_at: processing_started_at,
+                        completed_at: now,
                     },
-                    started_at,
+                    processing_started_at,
                 )
                 .await
             {

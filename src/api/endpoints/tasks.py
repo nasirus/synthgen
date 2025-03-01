@@ -5,6 +5,7 @@ from schemas.task import Task
 from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
 from database.elastic_session import ElasticsearchClient, get_elasticsearch_client
+from core.auth import get_current_user
 
 router = APIRouter()
 USE_API_PREFIX = True
@@ -24,7 +25,9 @@ class TaskListResponse(BaseModel):
 )
 @router.get("/tasks/{message_id}", response_model=Task)
 async def get_task(
-    message_id: str, es_client: ElasticsearchClient = Depends(get_elasticsearch_client)
+    message_id: str, 
+    current_user: str = Depends(get_current_user),
+    es_client: ElasticsearchClient = Depends(get_elasticsearch_client)
 ):
     try:
         event = await es_client.get_task_by_message_id(message_id)
@@ -47,7 +50,11 @@ async def get_task(
     reraise=True,
 )
 @router.delete("/tasks/{message_id}", status_code=204)
-async def delete_task(message_id: str, es_client=Depends(get_elasticsearch_client)):
+async def delete_task(
+    message_id: str, 
+    current_user: str = Depends(get_current_user),
+    es_client: ElasticsearchClient = Depends(get_elasticsearch_client)
+):
     try:
         deleted = await es_client.delete_task_by_message_id(message_id)
         if deleted == 0:

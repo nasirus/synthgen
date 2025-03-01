@@ -10,7 +10,7 @@ __pycache__/
 .cursorindexingignore
 
 # Environment Variables
-.env
+*.env
 .local.env
 
 # VSCode

@@ -25,7 +25,9 @@ services:
       - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit consumer_timeout 3600000
 
   api:
-    image: nasirus/synthgen-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     deploy:
       resources:
         limits:
@@ -49,7 +51,9 @@ services:
       - synthetic-data-network
 
   consumer:
-    image: nasirus/synthgen-consumer:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer
     deploy:
       mode: replicated
       replicas: ${NUM_CONSUMERS:-1}
@@ -97,7 +101,9 @@ services:
       - synthetic-data-network
 
   worker:
-    image: nasirus/synthgen-worker:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
     deploy:
       mode: replicated
       replicas: ${NUM_WORKERS:-1}
@@ -159,7 +165,7 @@ services:
     networks:
       - synthetic-data-network
     env_file:
-      - .env
+      - .env  
 
 volumes:
   minio_data:

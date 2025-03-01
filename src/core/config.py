@@ -50,5 +50,8 @@ class Settings:
     ELASTICSEARCH_USER: str = os.getenv("ELASTICSEARCH_USER", "elastic")
     ELASTICSEARCH_PASSWORD: str = os.getenv("ELASTICSEARCH_PASSWORD", "changeme")
 
+    # API Secret Key
+    API_SECRET_KEY: str = os.getenv("API_SECRET_KEY", "your-secret-key")
+
 
 settings = Settings()

@@ -21,6 +21,7 @@ import logging
 import datetime
 import json
 from database.elastic_session import ElasticsearchClient, get_elasticsearch_client
+from core.auth import get_current_user
 
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
@@ -86,7 +87,9 @@ class TaskListSubmission(BaseModel):
 )
 @router.get("/batches/{batch_id}", response_model=Batch)
 async def get_batch(
-    batch_id: str, es_client: ElasticsearchClient = Depends(get_elasticsearch_client)
+    batch_id: str,
+    es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
+    current_user: str = Depends(get_current_user),
 ):
     logger.info(f"Fetching status for batch {batch_id}")
     try:
@@ -145,7 +148,9 @@ async def get_batch(
 
 @router.post("/batches", response_model=BulkTaskResponse)
 async def submit_bulk_tasks(
-    file: UploadFile = File(...), batch_id: Optional[str] = Query(default=None)
+    file: UploadFile = File(...),
+    batch_id: Optional[str] = Query(default=None),
+    current_user: str = Depends(get_current_user),
 ):
     logger.info(f"Received bulk task submission: {file.filename}")
     if not file.filename.endswith(".jsonl"):
@@ -199,6 +204,7 @@ async def list_batches(
     page: int = Query(1, gt=0),
     page_size: int = Query(50, gt=0, le=100),
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
+    current_user: str = Depends(get_current_user),
 ):
     logger.info(f"Listing batches - page: {page}, page_size: {page_size}")
     try:
@@ -228,6 +234,7 @@ async def get_batch_tasks(
     batch_id: str,
     task_status: TaskStatus = Query(TaskStatus.COMPLETED),
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
+    current_user: str = Depends(get_current_user),
 ):
     """
     Stream tasks for a specific batch.
@@ -252,7 +259,9 @@ async def get_batch_tasks(
 )
 @router.delete("/batches/{batch_id}", status_code=204)
 async def delete_batch(
-    batch_id: str, es_client: ElasticsearchClient = Depends(get_elasticsearch_client)
+    batch_id: str,
+    es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
+    current_user: str = Depends(get_current_user),
 ):
     logger.info(f"Deleting batch {batch_id}")
     try:

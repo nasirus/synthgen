@@ -1,5 +1,0 @@
-we are building a framework using python to process LLM calls to generate synthetic data.
-we will use RabbitMQ as a message broker to send and receive messages between the different components of the framework.
-we will use Python FastAPI as a web framework to build the API.
-we will use Elasticsearch as a database.
-we will use Rust for the consumer of the messages.

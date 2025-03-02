@@ -49,7 +49,7 @@ SynthGen is built as a distributed system with several specialized components:
 ```mermaid
 flowchart TB
     %% Title
-    classDef titleClass fill:none,stroke:none,color:black,font-size:20px,font-weight:bold
+    classDef titleClass fill:none,stroke:none,color:#FFFFFF,font-size:20px,font-weight:bold
     title["Synthetic Data Generation Framework Architecture"]
     class title titleClass
     
@@ -73,21 +73,23 @@ flowchart TB
     api -->|"Query/Store Data"| elasticsearch
     api -->|"Publish Messages"| rabbitmq
     rabbitmq -->|"Process Messages"| worker
-    consumer -->|"Generate Synthetic Data
-    Request"| llm
-    llm -->|"Return Synthetic Data"| consumer
-    consumer -->|"Store Results"| elasticsearch
     rabbitmq -->|"Consume Messages"| consumer
     worker -->|"Store Processed Data"| elasticsearch
+    consumer -->|"Generate Synthetic Data Request"| llm
+    llm -->|"Return Synthetic Data"| consumer
+    consumer -->|"Store Results"| elasticsearch
     
-    %% Component styling
-    classDef clientStyle fill:#333,stroke:#000,color:white,stroke-width:2px
-    classDef apiStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px
-    classDef dbStyle fill:#31648C,stroke:#000,color:white,stroke-width:2px
-    classDef msgStyle fill:#FF6F61,stroke:#000,color:white,stroke-width:2px
-    classDef llmStyle fill:#9ACD32,stroke:#000,color:white,stroke-width:2px
-    classDef workerStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px
-    classDef consumerStyle fill:#DEA584,stroke:#000,color:white,stroke-width:2px
+    %% Component styling with centered text
+    classDef clientStyle fill:#333,stroke:#000,color:white,stroke-width:2px,text-align:center
+    classDef apiStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px,text-align:center
+    classDef dbStyle fill:#31648C,stroke:#000,color:white,stroke-width:2px,text-align:center
+    classDef msgStyle fill:#FF6F61,stroke:#000,color:white,stroke-width:2px,text-align:center
+    classDef llmStyle fill:#9ACD32,stroke:#000,color:white,stroke-width:2px,text-align:center
+    classDef workerStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px,text-align:center
+    classDef consumerStyle fill:#DEA584,stroke:#000,color:white,stroke-width:2px,text-align:center
+    
+    %% Subgraph styling for better visibility
+    classDef subgraphStyle color:#FFFFFF,text-align:center,font-weight:bold
     
     %% Apply styling
     class client clientStyle
@@ -98,31 +100,34 @@ flowchart TB
     class worker workerStyle
     class consumer consumerStyle
     
-    %% Subgraphs for clearer organization
-    subgraph Frontend
+    %% Subgraphs for clearer organization with better visibility
+    subgraph Frontend["Frontend"]
         client
     end
     
-    subgraph "API Layer"
+    subgraph APILayer["API Layer"]
         api
     end
     
-    subgraph "Data Storage"
+    subgraph DataStorage["Data Storage"]
         elasticsearch
     end
     
-    subgraph "Message Handling"
+    subgraph MessageHandling["Message Handling"]
         rabbitmq
     end
     
-    subgraph "Processing Layer"
+    subgraph ProcessingLayer["Processing Layer"]
         worker
         consumer
     end
     
-    subgraph "AI Layer"
+    subgraph AILayer["AI Layer"]
         llm
     end
+    
+    %% Apply subgraph styling
+    class Frontend,APILayer,DataStorage,MessageHandling,ProcessingLayer,AILayer subgraphStyle
 ```
 
 ## Getting Started

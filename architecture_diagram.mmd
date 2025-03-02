@@ -1,0 +1,76 @@
+flowchart TB
+    %% Title
+    classDef titleClass fill:none,stroke:none,color:black,font-size:20px,font-weight:bold
+    title["Synthetic Data Generation Framework Architecture"]
+    class title titleClass
+    
+    %% Component definitions with detailed labels
+    client([User/Client])
+    api["FastAPI
+    (Python)"]
+    rabbitmq["RabbitMQ
+    Message Broker"]
+    elasticsearch["Elasticsearch
+    Database"]
+    llm{{"Large Language Model
+    Synthetic Data Generator"}}
+    worker["Python Worker
+    Message Processor"]
+    consumer["Rust Consumer
+    Data Processor"]
+    
+    %% Connections with descriptive labels
+    client -->|"HTTP Requests"| api
+    api -->|"Query/Store Data"| elasticsearch
+    api -->|"Publish Messages"| rabbitmq
+    rabbitmq -->|"Process Messages"| worker
+    worker -->|"Generate Synthetic Data
+    Request"| llm
+    llm -->|"Return Synthetic Data"| worker
+    worker -->|"Store Results"| elasticsearch
+    rabbitmq -->|"Consume Messages"| consumer
+    consumer -->|"Store Processed Data"| elasticsearch
+    
+    %% Component styling
+    classDef clientStyle fill:#333,stroke:#000,color:white,stroke-width:2px
+    classDef apiStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px
+    classDef dbStyle fill:#31648C,stroke:#000,color:white,stroke-width:2px
+    classDef msgStyle fill:#FF6F61,stroke:#000,color:white,stroke-width:2px
+    classDef llmStyle fill:#9ACD32,stroke:#000,color:white,stroke-width:2px
+    classDef workerStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px
+    classDef consumerStyle fill:#DEA584,stroke:#000,color:white,stroke-width:2px
+    
+    %% Apply styling
+    class client clientStyle
+    class api apiStyle
+    class elasticsearch dbStyle
+    class rabbitmq msgStyle
+    class llm llmStyle
+    class worker workerStyle
+    class consumer consumerStyle
+    
+    %% Subgraphs for clearer organization
+    subgraph Frontend
+        client
+    end
+    
+    subgraph "API Layer"
+        api
+    end
+    
+    subgraph "Data Storage"
+        elasticsearch
+    end
+    
+    subgraph "Message Handling"
+        rabbitmq
+    end
+    
+    subgraph "Processing Layer"
+        worker
+        consumer
+    end
+    
+    subgraph "AI Layer"
+        llm
+    end 

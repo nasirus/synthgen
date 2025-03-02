@@ -4,9 +4,20 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { FaBrain, FaChartBar, FaChartLine, FaClipboardList, FaHome, FaTasks } from "react-icons/fa";
+import { FaBrain, FaChartBar, FaChartLine, FaClipboardList, FaHome, FaTasks, FaBars } from "react-icons/fa";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-export function MainNav() {
+interface MainNavProps {
+  className?: string;
+}
+
+export function MainNav({ className }: MainNavProps) {
   const pathname = usePathname();
 
   const routes = [
@@ -43,18 +54,49 @@ export function MainNav() {
   ];
 
   return (
-    <nav className="flex items-center space-x-4 lg:space-x-6">
-      <Link href="/dashboard" className="flex items-center space-x-2">
+    <div className={cn("flex w-full items-center", className)}>
+      {/* Logo - always visible */}
+      <Link href="/dashboard" className="flex items-center space-x-2 shrink-0">
         <FaBrain className="h-6 w-6" />
         <span className="font-bold text-xl">SynthGen</span>
       </Link>
-      <div className="ml-10 flex items-center space-x-4 lg:space-x-6">
+
+      {/* Mobile Navigation Menu */}
+      <div className="md:hidden ml-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon">
+              <FaBars className="h-4 w-4" />
+              <span className="sr-only">Menu</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {routes.map((route) => (
+              <DropdownMenuItem key={route.href} asChild>
+                <Link
+                  href={route.href}
+                  className={cn(
+                    "flex w-full items-center",
+                    route.active ? "font-medium" : ""
+                  )}
+                >
+                  {route.icon}
+                  {route.label}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Desktop Navigation Links */}
+      <div className="hidden md:flex md:ml-10 items-center space-x-4 lg:space-x-6">
         {routes.map((route) => (
           <Link
             key={route.href}
             href={route.href}
             className={cn(
-              "flex items-center text-sm font-medium transition-colors hover:text-primary",
+              "flex items-center text-sm font-medium transition-colors hover:text-primary whitespace-nowrap",
               route.active
                 ? "text-foreground"
                 : "text-muted-foreground"
@@ -65,6 +107,6 @@ export function MainNav() {
           </Link>
         ))}
       </div>
-    </nav>
+    </div>
   );
 } 

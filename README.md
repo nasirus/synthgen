@@ -63,9 +63,9 @@ flowchart TB
     Database"]
     llm{{"Large Language Model
     Synthetic Data Generator"}}
-    worker["Python Worker
-    Message Processor"]
     consumer["Rust Consumer
+    Message Processor"]
+    worker["Python Worker
     Data Processor"]
     
     %% Connections with descriptive labels

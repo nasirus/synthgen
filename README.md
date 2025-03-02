@@ -286,11 +286,12 @@ SynthGen offers extensive configuration options via environment variables, see .
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `RABBITMQ_URL` | RabbitMQ connection string | `amqp://guest:guest@rabbitmq:5672` |
-| `ELASTICSEARCH_URL` | Elasticsearch connection string | `http://elasticsearch:9200` |
+| `API_SECRET_KEY` | API Secret for FastAPI service | `sk1-1564813548` |
 | `API_PORT` | Port for FastAPI service | `8000` |
 | `NUM_WORKERS` | Number of Python worker instances | `1` |
 | `NUM_CONSUMERS` | Number of Rust consumer instances | `1` |
+| `MAX_PARALLEL_TASKS` | Number of parallel tasks per consumer | `10` |
+
 
 ## Deployment
 

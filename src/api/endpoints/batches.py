@@ -22,6 +22,7 @@ import datetime
 import json
 from database.elastic_session import ElasticsearchClient, get_elasticsearch_client
 from core.auth import get_current_user
+from enum import Enum
 
 router = APIRouter()
 rabbitmq_handler = RabbitMQHandler()
@@ -111,6 +112,30 @@ class UsageStatsResponse(BaseModel):
     current_time: str
     time_series: List[TimeSeriesDataPoint]
     summary: StatsSummary
+
+
+class CalendarInterval(str, Enum):
+    """
+    Valid Elasticsearch calendar intervals as described in the documentation.
+
+    Calendar intervals are time-based intervals that account for irregular time periods like
+    months (which can have 28-31 days) or years (which can be leap years).
+    """
+
+    MINUTE = "minute"
+    MINUTE_SHORT = "1m"
+    HOUR = "hour"
+    HOUR_SHORT = "1h"
+    DAY = "day"
+    DAY_SHORT = "1d"
+    WEEK = "week"
+    WEEK_SHORT = "1w"
+    MONTH = "month"
+    MONTH_SHORT = "1M"
+    QUARTER = "quarter"
+    QUARTER_SHORT = "1q"
+    YEAR = "year"
+    YEAR_SHORT = "1y"
 
 
 @retry(
@@ -322,12 +347,24 @@ async def delete_batch(
 async def get_batch_usage_stats(
     batch_id: str,
     time_range: str = Query("24h", description="Time range (e.g. 24h, 7d, 30d)"),
-    interval: str = Query("1h", description="Time bucket size (e.g. 1h, 1d, 1w)"),
+    interval: CalendarInterval = Query(
+        CalendarInterval.HOUR_SHORT,
+        description="Time bucket size using Elasticsearch calendar intervals (e.g. 1h, 1d, 1w, 1M, 1q, 1y)",
+    ),
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
     current_user: str = Depends(get_current_user),
 ):
     """
     Get real-time usage statistics for a batch with time-bucketed metrics.
+
+    The interval parameter accepts the following Elasticsearch calendar intervals:
+    - minute, 1m: One minute interval
+    - hour, 1h: One hour interval
+    - day, 1d: One day interval
+    - week, 1w: One week interval
+    - month, 1M: One month interval
+    - quarter, 1q: One quarter interval
+    - year, 1y: One year interval
     """
     logger.info(f"Fetching usage stats for batch {batch_id}")
     try:

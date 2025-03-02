@@ -33,7 +33,7 @@ flowchart TB
     rabbitmq -->|"Process Messages"| worker
     consumer -->|"Generate Synthetic Data
     Request"| llm
-    llm -->|"Return Synthetic Data"| worker
+    llm -->|"Return Synthetic Data"| consumer
     consumer -->|"Store Results"| elasticsearch
     rabbitmq -->|"Consume Messages"| consumer
     worker -->|"Store Processed Data"| elasticsearch

@@ -538,7 +538,7 @@ class ElasticsearchClient:
                         "total_tokens": bucket["total_tokens"]["value"] or 0,
                         "prompt_tokens": bucket["prompt_tokens"]["value"] or 0,
                         "completion_tokens": completion_tokens,
-                        "avg_duration_ms": bucket["avg_duration"]["value"] or 0,
+                        "avg_duration_ms": round(bucket["avg_duration"]["value"] or 0),
                         "tokens_per_second": round(tokens_per_second, 2),
                     }
                 )
@@ -575,19 +575,21 @@ class ElasticsearchClient:
                     "total_tokens": result["aggregations"]["total_tokens_used"]["value"]
                     or 0,
                     "completion_tokens": total_completion_tokens,
-                    "average_response_time": result["aggregations"][
-                        "avg_response_time"
-                    ]["value"]
-                    or 0,
+                    "average_response_time": round(
+                        result["aggregations"]["avg_response_time"]["value"] or 0
+                    ),
                     "tokens_per_second": round(overall_tokens_per_second, 2),
-                    "cache_hit_rate": (
+                    "cache_hit_rate": round(
                         (
-                            result["aggregations"]["total_cached"]["doc_count"]
-                            / result["hits"]["total"]["value"]
-                            * 100
-                        )
-                        if result["hits"]["total"]["value"] > 0
-                        else 0
+                            (
+                                result["aggregations"]["total_cached"]["doc_count"]
+                                / result["hits"]["total"]["value"]
+                                * 100
+                            )
+                            if result["hits"]["total"]["value"] > 0
+                            else 0
+                        ),
+                        2,
                     ),
                 },
             }

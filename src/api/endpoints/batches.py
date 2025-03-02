@@ -91,7 +91,7 @@ class TimeSeriesDataPoint(BaseModel):
     total_tokens: int
     prompt_tokens: int
     completion_tokens: int
-    avg_duration_ms: float
+    avg_duration_ms: int
     tokens_per_second: float
 
 
@@ -102,7 +102,7 @@ class StatsSummary(BaseModel):
     cached_tasks: int
     total_tokens: int
     completion_tokens: int
-    average_response_time: float
+    average_response_time: int
     tokens_per_second: float
     cache_hit_rate: float
 

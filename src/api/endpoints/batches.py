@@ -80,6 +80,39 @@ class TaskListSubmission(BaseModel):
     tasks: List[TaskSubmission]
 
 
+class TimeSeriesDataPoint(BaseModel):
+    timestamp: str
+    total_tasks: int
+    completed_tasks: int
+    failed_tasks: int
+    cached_tasks: int
+    total_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
+    avg_duration_ms: float
+    tokens_per_second: float
+
+
+class StatsSummary(BaseModel):
+    total_tasks: int
+    completed_tasks: int
+    failed_tasks: int
+    cached_tasks: int
+    total_tokens: int
+    completion_tokens: int
+    average_response_time: float
+    tokens_per_second: float
+    cache_hit_rate: float
+
+
+class UsageStatsResponse(BaseModel):
+    time_range: str
+    interval: str
+    current_time: str
+    time_series: List[TimeSeriesDataPoint]
+    summary: StatsSummary
+
+
 @retry(
     stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
     wait=wait_exponential(multiplier=1, min=4, max=10),
@@ -278,3 +311,43 @@ async def delete_batch(
     except Exception as e:
         logger.error(f"Failed to delete batch {batch_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete batch: {str(e)}")
+
+
+@retry(
+    stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True,
+)
+@router.get("/batches/{batch_id}/stats", response_model=UsageStatsResponse)
+async def get_batch_usage_stats(
+    batch_id: str,
+    time_range: str = Query("24h", description="Time range (e.g. 24h, 7d, 30d)"),
+    interval: str = Query("1h", description="Time bucket size (e.g. 1h, 1d, 1w)"),
+    es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Get real-time usage statistics for a batch with time-bucketed metrics.
+    """
+    logger.info(f"Fetching usage stats for batch {batch_id}")
+    try:
+        stats = await es_client.get_usage_stats(
+            batch_id=batch_id, time_range=time_range, interval=interval
+        )
+
+        if not stats:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No usage statistics available for batch {batch_id}",
+            )
+
+        logger.info(f"Successfully retrieved usage stats for batch {batch_id}")
+        return UsageStatsResponse(**stats)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch usage stats for batch {batch_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch usage statistics: {str(e)}"
+        )

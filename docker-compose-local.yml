@@ -35,7 +35,7 @@ services:
           memory: 1024M
     container_name: synthetic-data-api
     ports:
-      - "8002:8000"
+      - "${API_PORT:-8002}:8000"
     depends_on:
       rabbitmq:
         condition: service_healthy

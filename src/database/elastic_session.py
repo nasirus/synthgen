@@ -33,7 +33,7 @@ class ElasticsearchClient:
                     "settings": {
                         "number_of_replicas": 0,
                         "number_of_shards": 1,
-                        "refresh_interval": "2s",
+                        "refresh_interval": "5s",
                     },
                     "mappings": {
                         "properties": {
@@ -421,6 +421,179 @@ class ElasticsearchClient:
         query = {"query": {"term": {"message_id": message_id}}}
         result = await self.client.delete_by_query(index="events", body=query)
         return result.get("deleted", 0)
+
+    async def delete_task_by_hash(self, hash: str) -> int:
+        """
+        Delete a task document by its hash.
+        Returns the number of documents deleted.
+        """
+        query = {"query": {"term": {"body_hash": hash}}}
+        result = await self.client.delete_by_query(index="events", body=query)
+        return result.get("deleted", 0)
+
+    async def get_usage_stats(
+        self, batch_id: str, time_range: str = "24h", interval: str = "1h"
+    ) -> Dict[str, Any]:
+        """
+        Get usage statistics over specified time range bucketed by intervals.
+
+        Args:
+            time_range: Time range to analyze (e.g. "24h", "7d", "30d")
+            interval: Time bucket size (e.g. "1h", "1d", "1w")
+
+        Returns:
+            Dictionary with usage statistics over time
+        """
+        # Use timezone-aware datetime with UTC
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        query = {
+            "size": 0,
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "completed_at": {
+                                    "gte": f"now-{time_range}",
+                                    "lte": "now",
+                                }
+                            }
+                        },
+                        {"term": {"batch_id": batch_id}},
+                    ]
+                }
+            },
+            "aggs": {
+                "tasks_over_time": {
+                    "date_histogram": {
+                        "field": "completed_at",
+                        "calendar_interval": interval,
+                        "format": "yyyy-MM-dd HH:mm:ss",
+                    },
+                    "aggs": {
+                        "completed_tasks": {
+                            "filter": {"term": {"status": "COMPLETED"}}
+                        },
+                        "failed_tasks": {"filter": {"term": {"status": "FAILED"}}},
+                        "cached_tasks": {"filter": {"term": {"cached": True}}},
+                        "total_tokens": {
+                            "sum": {"field": "completions.usage.total_tokens"}
+                        },
+                        "prompt_tokens": {
+                            "sum": {"field": "completions.usage.prompt_tokens"}
+                        },
+                        "completion_tokens": {
+                            "sum": {"field": "completions.usage.completion_tokens"}
+                        },
+                        "avg_duration": {"avg": {"field": "duration"}},
+                        "sum_duration": {"sum": {"field": "duration"}},
+                    },
+                },
+                "total_completed": {"filter": {"term": {"status": "COMPLETED"}}},
+                "total_failed": {"filter": {"term": {"status": "FAILED"}}},
+                "total_cached": {"filter": {"term": {"cached": True}}},
+                "total_tokens_used": {
+                    "sum": {"field": "completions.usage.total_tokens"}
+                },
+                "total_completion_tokens": {
+                    "sum": {"field": "completions.usage.completion_tokens"}
+                },
+                "sum_duration": {
+                    "filter": {"term": {"status": "COMPLETED"}},
+                    "aggs": {"value": {"sum": {"field": "duration"}}},
+                },
+                "avg_response_time": {"avg": {"field": "duration"}},
+            },
+        }
+
+        try:
+            result = await self.client.search(index="events", body=query)
+
+            buckets = result["aggregations"]["tasks_over_time"]["buckets"]
+            time_series = []
+
+            for bucket in buckets:
+                # Calculate tokens per second for this time bucket
+                sum_duration_ms = (
+                    bucket["sum_duration"]["value"] or 1
+                )  # Avoid division by zero
+                sum_duration_seconds = (
+                    sum_duration_ms / 1000 if sum_duration_ms > 0 else 1
+                )
+                completion_tokens = bucket["completion_tokens"]["value"] or 0
+                tokens_per_second = (
+                    completion_tokens / sum_duration_seconds
+                    if sum_duration_seconds > 0
+                    else 0
+                )
+
+                time_series.append(
+                    {
+                        "timestamp": bucket["key_as_string"],
+                        "total_tasks": bucket["doc_count"],
+                        "completed_tasks": bucket["completed_tasks"]["doc_count"],
+                        "failed_tasks": bucket["failed_tasks"]["doc_count"],
+                        "cached_tasks": bucket["cached_tasks"]["doc_count"],
+                        "total_tokens": bucket["total_tokens"]["value"] or 0,
+                        "prompt_tokens": bucket["prompt_tokens"]["value"] or 0,
+                        "completion_tokens": completion_tokens,
+                        "avg_duration_ms": bucket["avg_duration"]["value"] or 0,
+                        "tokens_per_second": round(tokens_per_second, 2),
+                    }
+                )
+
+            # Calculate overall tokens per second for the summary
+            total_duration_ms = (
+                result["aggregations"]["sum_duration"]["value"]["value"] or 1
+            )  # Avoid division by zero
+            total_duration_seconds = (
+                total_duration_ms / 1000 if total_duration_ms > 0 else 1
+            )
+            total_completion_tokens = (
+                result["aggregations"]["total_completion_tokens"]["value"] or 0
+            )
+            overall_tokens_per_second = (
+                total_completion_tokens / total_duration_seconds
+                if total_duration_seconds > 0
+                else 0
+            )
+
+            # Calculate summary statistics
+            return {
+                "time_range": time_range,
+                "interval": interval,
+                "current_time": now,
+                "time_series": time_series,
+                "summary": {
+                    "total_tasks": result["hits"]["total"]["value"],
+                    "completed_tasks": result["aggregations"]["total_completed"][
+                        "doc_count"
+                    ],
+                    "failed_tasks": result["aggregations"]["total_failed"]["doc_count"],
+                    "cached_tasks": result["aggregations"]["total_cached"]["doc_count"],
+                    "total_tokens": result["aggregations"]["total_tokens_used"]["value"]
+                    or 0,
+                    "completion_tokens": total_completion_tokens,
+                    "average_response_time": result["aggregations"][
+                        "avg_response_time"
+                    ]["value"]
+                    or 0,
+                    "tokens_per_second": round(overall_tokens_per_second, 2),
+                    "cache_hit_rate": (
+                        (
+                            result["aggregations"]["total_cached"]["doc_count"]
+                            / result["hits"]["total"]["value"]
+                            * 100
+                        )
+                        if result["hits"]["total"]["value"] > 0
+                        else 0
+                    ),
+                },
+            }
+        except Exception as e:
+            logger.error(f"Error retrieving usage statistics: {str(e)}")
+            raise
 
 
 # Create a global instance

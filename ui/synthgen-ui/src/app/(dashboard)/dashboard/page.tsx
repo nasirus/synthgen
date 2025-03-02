@@ -82,8 +82,8 @@ export default function DashboardPage() {
 
         fetchHealthData();
 
-        // Refresh health data every 5 seconds
-        const interval = setInterval(fetchHealthData, 5000);
+        // Refresh health data every 10 seconds
+        const interval = setInterval(fetchHealthData, 10000);
 
         return () => clearInterval(interval);
     }, []);

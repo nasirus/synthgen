@@ -31,12 +31,12 @@ flowchart TB
     api -->|"Query/Store Data"| elasticsearch
     api -->|"Publish Messages"| rabbitmq
     rabbitmq -->|"Process Messages"| worker
-    worker -->|"Generate Synthetic Data
+    consumer -->|"Generate Synthetic Data
     Request"| llm
     llm -->|"Return Synthetic Data"| worker
-    worker -->|"Store Results"| elasticsearch
+    consumer -->|"Store Results"| elasticsearch
     rabbitmq -->|"Consume Messages"| consumer
-    consumer -->|"Store Processed Data"| elasticsearch
+    worker -->|"Store Processed Data"| elasticsearch
     
     %% Component styling
     classDef clientStyle fill:#333,stroke:#000,color:white,stroke-width:2px
@@ -108,13 +108,13 @@ The message broker that enables asynchronous communication between components:
 ### 4. Processing Layer
 Consists of two main components:
 
-#### Rust Consumer
+#### Python Worker
 - Processes messages from RabbitMQ
 - Interacts with the LLM to generate synthetic data
 - Stores results in Elasticsearch
 - Handles retries and error scenarios
 
-#### Python Worker
+#### Rust Consumer
 - High-performance message consumer written in Rust
 - Optimized for efficiency and throughput
 - Processes specific types of messages

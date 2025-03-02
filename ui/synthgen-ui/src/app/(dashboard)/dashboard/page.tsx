@@ -6,7 +6,7 @@ import { healthService, batchesService } from "@/services/api";
 import { FaCheck, FaExclamationTriangle, FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type HealthStatus = "HEALTHY" | "UNHEALTHY";
+type HealthStatus = "healthy" | "unhealthy";
 
 interface HealthResponse {
     status: HealthStatus;
@@ -82,15 +82,15 @@ export default function DashboardPage() {
 
         fetchHealthData();
 
-        // Refresh health data every 30 seconds
-        const interval = setInterval(fetchHealthData, 30000);
+        // Refresh health data every 5 seconds
+        const interval = setInterval(fetchHealthData, 5000);
 
         return () => clearInterval(interval);
     }, []);
 
     const renderHealthIcon = (status: HealthStatus | undefined) => {
         if (loading) return <Skeleton className="h-8 w-8 rounded-full" />;
-        return status === "HEALTHY" ? (
+        return status === "healthy" ? (
             <FaCheck className="h-8 w-8 text-green-500" />
         ) : (
             <FaExclamationTriangle className="h-8 w-8 text-yellow-500" />

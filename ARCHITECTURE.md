@@ -19,8 +19,9 @@ flowchart TB
     Message Broker"]
     elasticsearch["Elasticsearch
     Database"]
-    llm{{"Large Language Model
-    Synthetic Data Generator"}}
+    minio["MinIO 
+    S3 Compatible File Storage"]
+    llm{{"Large Language Model"}}
     consumer["Rust Consumer
     Message Processor"]
     worker["Python Worker
@@ -30,9 +31,12 @@ flowchart TB
     client -->|"HTTP Requests"| api
     api -->|"Query/Store Data"| elasticsearch
     api -->|"Publish Messages"| rabbitmq
+    api -->|"Store Temp Files"| minio
     rabbitmq -->|"Process Messages"| worker
+    worker -->|"Publish Processed File Data"| rabbitmq
     rabbitmq -->|"Consume Messages"| consumer
     worker -->|"Store Processed Data"| elasticsearch
+    worker -->|"Read/Write Temp Files"| minio
     consumer -->|"Generate Synthetic Data Request"| llm
     llm -->|"Return Synthetic Data"| consumer
     consumer -->|"Store Results"| elasticsearch
@@ -41,6 +45,7 @@ flowchart TB
     classDef clientStyle fill:#333,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef apiStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef dbStyle fill:#31648C,stroke:#000,color:white,stroke-width:2px,text-align:center
+    classDef storageStyle fill:#6B8E23,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef msgStyle fill:#FF6F61,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef llmStyle fill:#9ACD32,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef workerStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px,text-align:center
@@ -53,6 +58,7 @@ flowchart TB
     class client clientStyle
     class api apiStyle
     class elasticsearch dbStyle
+    class minio storageStyle
     class rabbitmq msgStyle
     class llm llmStyle
     class worker workerStyle
@@ -67,8 +73,12 @@ flowchart TB
         api
     end
     
-    subgraph DataStorage["Data Storage"]
+    subgraph PermanentStorage["Data Storage"]
         elasticsearch
+    end
+    
+    subgraph TemporaryStorage["Temporary File Storage"]
+        minio
     end
     
     subgraph MessageHandling["Message Handling"]
@@ -93,44 +103,43 @@ flowchart TB
 ### 1. Frontend - User/Client
 This represents the entry point where users or external systems interact with our framework. Clients make HTTP requests to the API layer.
 
-### 2. API Layer - FastAPI (Python)
-The web framework that handles incoming HTTP requests. It routes requests appropriately and is responsible for:
-- Authentication and authorization
-- Input validation
-- Request routing
-- Response formatting
-- Publishing messages to RabbitMQ
-- Interacting with Elasticsearch for data storage and retrieval
+### 2. API Layer - FastAPI
+The web framework handling HTTP requests and coordinating system components. Responsible for:
+- Authentication/authorization and input validation
+- Temporary file storage in MinIO
+- Publishing processing tasks to RabbitMQ
+- Querying/storing metadata in Elasticsearch
+- Managing client responses
 
 ### 3. Message Handling - RabbitMQ
-The message broker that enables asynchronous communication between components:
-- Queues messages for processing
-- Ensures message delivery
-- Handles message persistence
-- Supports multiple consumers
-- Provides message acknowledgment mechanisms
+The message broker enabling asynchronous communication:
+- Implements durable queues for message persistence
+- Facilitates decoupled component communication
+- Supports both Python Worker and Rust Consumer
+- Enables load balancing across multiple workers
 
 ### 4. Processing Layer
-Consists of two main components:
 
 #### Python Worker
-- Processes messages from RabbitMQ
-- Interacts with the LLM to generate synthetic data
-- Stores results in Elasticsearch
-- Handles retries and error scenarios
+- Processes file-based workloads from RabbitMQ
+- Manages temporary files in MinIO
+- Transforms/preprocesses input data
+- Publishes processed data to RabbitMQ for downstream tasks
+- Handles data validation and error recovery
 
 #### Rust Consumer
-- High-performance message consumer written in Rust
-- Optimized for efficiency and throughput
-- Processes specific types of messages
-- Stores processed data in Elasticsearch
+- High-performance message processor for text-based tasks
+- Generates synthetic data via LLM integration
+- Implements efficient memory management
+- Handles retry logic with exponential backoff
+- Processes structured data messages
 
 ### 5. AI Layer - Large Language Model
-The AI component responsible for generating synthetic data:
-- Receives requests from the Python Worker
-- Generates high-quality synthetic data based on inputs
-- Returns data back to the Worker for storage
-- Can be configured to use different LLM providers
+The synthetic data generation engine:
+- Accessed exclusively by Rust Consumer via API
+- Configurable model parameters and providers
+- Returns structured data in system format
+- Handles rate limiting and API errors
 
 ### 6. Data Storage - Elasticsearch
 The database layer that stores:
@@ -140,15 +149,26 @@ The database layer that stores:
 - Logs and monitoring information
 - Configuration data
 
+### 7. Temporary File Storage - MinIO
+The S3-compatible object storage layer for temporary file handling:
+- Temporarily stores uploaded batch files from clients
+- Provides intermediate storage during processing workflows
+- Enables efficient file reading/writing for workers
+- Manages temporary files until processing is complete
+- Not intended for long-term data persistence
+
 ## Data Flow
 
-1. A client sends an HTTP request to the FastAPI endpoint
-2. FastAPI processes the request and publishes a message to RabbitMQ
-3. The Python Worker consumes the message and sends a request to the LLM
-4. The LLM generates synthetic data and returns it to the Worker
-5. The Worker stores the results in Elasticsearch
-6. In parallel, the Rust Consumer can process other types of messages from RabbitMQ
-7. The Rust Consumer also stores its processed data in Elasticsearch
-8. Clients can query FastAPI to retrieve the generated data from Elasticsearch
+1. A client sends an HTTP request with file data to the FastAPI endpoint
+2. FastAPI temporarily stores the uploaded files in MinIO
+3. FastAPI publishes a message to RabbitMQ with file metadata
+4. The Python Worker consumes the message from RabbitMQ
+5. The Worker reads the file from MinIO temporary storage and processes it
+6. After processing the file, the Worker publishes new messages back to RabbitMQ with the extracted data
+7. The Worker stores the processed data in Elasticsearch for permanent storage
+8. In parallel, the Rust Consumer processes messages from RabbitMQ, including those published by the Worker
+9. The Rust Consumer generates synthetic data via the LLM and stores results directly in Elasticsearch
+10. Once processing is complete, temporary files in MinIO may be cleaned up
+11. Clients can query FastAPI to retrieve the permanently stored data from Elasticsearch
 
-This architecture provides a scalable, fault-tolerant approach to synthetic data generation using LLMs. 
+This architecture provides a scalable, fault-tolerant approach to synthetic data generation using LLMs with efficient temporary file handling. 

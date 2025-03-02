@@ -61,8 +61,9 @@ flowchart TB
     Message Broker"]
     elasticsearch["Elasticsearch
     Database"]
-    llm{{"Large Language Model
-    Synthetic Data Generator"}}
+    minio["MinIO Object Storage
+    S3-Compatible"]
+    llm{{"Large Language Model"}}
     consumer["Rust Consumer
     Message Processor"]
     worker["Python Worker
@@ -72,9 +73,12 @@ flowchart TB
     client -->|"HTTP Requests"| api
     api -->|"Query/Store Data"| elasticsearch
     api -->|"Publish Messages"| rabbitmq
+    api -->|"Store Files"| minio
     rabbitmq -->|"Process Messages"| worker
+    worker -->|"Publish Processed File Data"| rabbitmq
     rabbitmq -->|"Consume Messages"| consumer
     worker -->|"Store Processed Data"| elasticsearch
+    worker -->|"Read/Write Files"| minio
     consumer -->|"Generate Synthetic Data Request"| llm
     llm -->|"Return Synthetic Data"| consumer
     consumer -->|"Store Results"| elasticsearch
@@ -83,6 +87,7 @@ flowchart TB
     classDef clientStyle fill:#333,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef apiStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef dbStyle fill:#31648C,stroke:#000,color:white,stroke-width:2px,text-align:center
+    classDef storageStyle fill:#6B8E23,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef msgStyle fill:#FF6F61,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef llmStyle fill:#9ACD32,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef workerStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px,text-align:center
@@ -95,6 +100,7 @@ flowchart TB
     class client clientStyle
     class api apiStyle
     class elasticsearch dbStyle
+    class minio storageStyle
     class rabbitmq msgStyle
     class llm llmStyle
     class worker workerStyle
@@ -111,6 +117,7 @@ flowchart TB
     
     subgraph DataStorage["Data Storage"]
         elasticsearch
+        minio
     end
     
     subgraph MessageHandling["Message Handling"]

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { healthService, batchesService } from "@/services/api";
-import { FaCheck, FaExclamationTriangle, FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner } from "react-icons/fa";
+import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type HealthStatus = "healthy" | "unhealthy";
@@ -118,82 +118,74 @@ export default function DashboardPage() {
         return () => clearInterval(interval);
     }, []);
 
-    const renderHealthIcon = (status: HealthStatus | undefined) => {
-        if (loading) return <Skeleton className="h-8 w-8 rounded-full" />;
-        return status === "healthy" ? (
-            <FaCheck className="h-8 w-8 text-green-500" />
-        ) : (
-            <FaExclamationTriangle className="h-8 w-8 text-yellow-500" />
-        );
-    };
-
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {/* API Status Card */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">API Status</CardTitle>
-                        <FaServer className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center space-x-4">
-                            {renderHealthIcon(health?.services.api)}
-                            <div>
-                                <div className="text-2xl font-bold">
+                {/* Combined Status Card */}
+                <Card className="col-span-full lg:col-span-3 p-0">
+                    <CardContent className="p-1 sm:p-2">
+                        <div className="grid grid-cols-3 gap-2">
+                            {/* API Status */}
+                            <div className="flex items-center justify-center space-x-3 p-3 rounded-lg bg-muted/50">
+                                <div className="relative">
                                     {loading ? (
-                                        <Skeleton className="h-8 w-20" />
+                                        <Skeleton className="h-10 w-10 rounded-full" />
                                     ) : (
-                                        health?.services.api || "UNKNOWN"
+                                        <>
+                                            <FaServer className="h-5 w-5 text-foreground" />
+                                            <div className={`absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-background ${health?.services.api === 'healthy' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                                        </>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground">API Web Server</p>
+                                <div>
+                                    <p className="text-sm font-medium">API Server</p>
+                                    <div className="text-xs text-muted-foreground">
+                                        {loading ? <Skeleton className="h-4 w-20" /> : 
+                                        health?.services.api?.toUpperCase() || 'UNKNOWN'}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
 
-                {/* RabbitMQ Status Card */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">RabbitMQ Status</CardTitle>
-                        <FaExchangeAlt className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center space-x-4">
-                            {renderHealthIcon(health?.services.rabbitmq)}
-                            <div>
-                                <div className="text-2xl font-bold">
+                            {/* RabbitMQ Status */}
+                            <div className="flex items-center justify-center space-x-3 p-3 rounded-lg bg-muted/50">
+                                <div className="relative">
                                     {loading ? (
-                                        <Skeleton className="h-8 w-20" />
+                                        <Skeleton className="h-10 w-10 rounded-full" />
                                     ) : (
-                                        health?.services.rabbitmq || "UNKNOWN"
+                                        <>
+                                            <FaExchangeAlt className="h-5 w-5 text-foreground" />
+                                            <div className={`absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-background ${health?.services.rabbitmq === 'healthy' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                                        </>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground">Message Broker</p>
+                                <div>
+                                    <p className="text-sm font-medium">Message Broker</p>
+                                    <div className="text-xs text-muted-foreground">
+                                        {loading ? <Skeleton className="h-4 w-20" /> : 
+                                        health?.services.rabbitmq?.toUpperCase() || 'UNKNOWN'}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
 
-                {/* Elasticsearch Status Card */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Elasticsearch Status</CardTitle>
-                        <FaDatabase className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center space-x-4">
-                            {renderHealthIcon(health?.services.elasticsearch)}
-                            <div>
-                                <div className="text-2xl font-bold">
+                            {/* Elasticsearch Status */}
+                            <div className="flex items-center justify-center space-x-3 p-3 rounded-lg bg-muted/50">
+                                <div className="relative">
                                     {loading ? (
-                                        <Skeleton className="h-8 w-20" />
+                                        <Skeleton className="h-10 w-10 rounded-full" />
                                     ) : (
-                                        health?.services.elasticsearch || "UNKNOWN"
+                                        <>
+                                            <FaDatabase className="h-5 w-5 text-foreground" />
+                                            <div className={`absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-background ${health?.services.elasticsearch === 'healthy' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                                        </>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground">Database</p>
+                                <div>
+                                    <p className="text-sm font-medium">Database</p>
+                                    <div className="text-xs text-muted-foreground">
+                                        {loading ? <Skeleton className="h-4 w-20" /> : 
+                                        health?.services.elasticsearch?.toUpperCase() || 'UNKNOWN'}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </CardContent>

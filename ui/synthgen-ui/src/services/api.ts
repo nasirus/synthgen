@@ -36,8 +36,8 @@ export const healthService = {
 
 // Batches service
 export const batchesService = {
-  getBatches: async (page = 1, pageSize = 50) => {
-    return apiClient.get(`/api/v1/batches?page=${page}&page_size=${pageSize}`);
+  getBatches: async () => {
+    return apiClient.get(`/api/v1/batches`);
   },
   getBatch: async (batchId: string) => {
     return apiClient.get(`/api/v1/batches/${batchId}`);

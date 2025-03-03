@@ -146,39 +146,40 @@ class TimeRange(BaseModel):
     - 5m (5 minutes)
     - 2h (2 hours)
     - 1d (1 day)
-    
+
     Note: The 'now-' prefix is added automatically by the ElasticsearchClient.get_usage_stats method,
     so it should not be included in the time_range parameter.
     """
+
     time_range: str
-    
-    @field_validator('time_range')
+
+    @field_validator("time_range")
     @classmethod
     def validate_time_range(cls, v):
         # Pattern to validate time ranges in the format of Xm, Xh, Xd
-        pattern = r'^(\d+)([mhd])$'
+        pattern = r"^(\d+)([mhd])$"
         match = re.match(pattern, v)
-        
+
         if not match:
             raise ValueError(
                 "Time range must be in format 'Xm', 'Xh', or 'Xd' "
                 "where X is a positive number and m=minutes, h=hours, d=days"
             )
-        
+
         value, unit = match.groups()
         value = int(value)
-        
+
         if value <= 0:
             raise ValueError("Time range value must be positive")
-            
+
         # Validate specific unit limits if needed
-        if unit == 'm' and value > 1440:  # 24 hours in minutes
+        if unit == "m" and value > 1440:  # 24 hours in minutes
             raise ValueError("Minutes should not exceed 1440 (24 hours)")
-        elif unit == 'h' and value > 720:  # 30 days in hours
+        elif unit == "h" and value > 720:  # 30 days in hours
             raise ValueError("Hours should not exceed 720 (30 days)")
-        elif unit == 'd' and value > 365:  # 1 year in days
+        elif unit == "d" and value > 365:  # 1 year in days
             raise ValueError("Days should not exceed 365 (1 year)")
-            
+
         return v
 
 
@@ -303,14 +304,12 @@ async def submit_bulk_tasks(
 )
 @router.get("/batches", response_model=BatchListResponse)
 async def list_batches(
-    page: int = Query(1, gt=0),
-    page_size: int = Query(50, gt=0, le=100),
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
     current_user: str = Depends(get_current_user),
 ):
-    logger.info(f"Listing batches - page: {page}, page_size: {page_size}")
+    logger.info("Listing batches")
     try:
-        result = await es_client.list_batches(page, page_size)
+        result = await es_client.list_batches()
 
         batches = [Batch(**batch_data) for batch_data in result["batches"]]
 
@@ -391,19 +390,19 @@ async def delete_batch(
 async def get_batch_usage_stats(
     batch_id: str,
     time_range: str = Query(
-        "24h", 
-        description="Time range for analysis without 'now-' prefix (e.g., 5m, 2h, 1d)"
+        "24h",
+        description="Time range for analysis without 'now-' prefix (e.g., 5m, 2h, 1d)",
     ),
     interval: CalendarInterval = Query(
-        CalendarInterval.HOUR_SHORT, 
-        description="Time bucket size using Elasticsearch calendar intervals (e.g. 1h, 1d, 1w, 1M, 1q, 1y)"
+        CalendarInterval.HOUR_SHORT,
+        description="Time bucket size using Elasticsearch calendar intervals (e.g. 1h, 1d, 1w, 1M, 1q, 1y)",
     ),
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
     current_user: str = Depends(get_current_user),
 ):
     """
     Get real-time usage statistics for a batch with time-bucketed metrics.
-    
+
     The interval parameter accepts the following Elasticsearch calendar intervals:
     - minute, 1m: One minute interval
     - hour, 1h: One hour interval
@@ -412,7 +411,7 @@ async def get_batch_usage_stats(
     - month, 1M: One month interval
     - quarter, 1q: One quarter interval
     - year, 1y: One year interval
-    
+
     The time_range parameter format (without 'now-' prefix, which is added automatically):
     - Xm: X minutes (e.g., 30m for the last 30 minutes)
     - Xh: X hours (e.g., 6h for the last 6 hours)
@@ -422,7 +421,7 @@ async def get_batch_usage_stats(
     try:
         # Validate the time_range parameter
         TimeRange(time_range=time_range)
-        
+
         stats = await es_client.get_usage_stats(
             batch_id=batch_id, time_range=time_range, interval=interval
         )

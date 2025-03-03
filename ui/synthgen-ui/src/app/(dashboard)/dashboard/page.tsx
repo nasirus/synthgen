@@ -71,7 +71,7 @@ export default function DashboardPage() {
                 setHealth(response.data);
 
                 // Fetch batch statistics
-                const batchesResponse = await batchesService.getBatches(1, 100);
+                const batchesResponse = await batchesService.getBatches();
                 console.log("Batches data received:", batchesResponse.data);
                 const batches = batchesResponse.data.batches;
 

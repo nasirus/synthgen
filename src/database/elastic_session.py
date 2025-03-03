@@ -109,7 +109,7 @@ class ElasticsearchClient:
 
         return self._process_batch_stats(result, batch_id)
 
-    async def list_batches(self, page: int, page_size: int) -> Dict[str, Any]:
+    async def list_batches(self) -> Dict[str, Any]:
         """Get paginated list of all batches with their statistics."""
         query = {
             "size": 0,
@@ -321,15 +321,13 @@ class ElasticsearchClient:
 
             # Calculate batch status
             batch_status = (
-                TaskStatus.PENDING
-                if pending_count > 0
+                TaskStatus.PROCESSING
+                if processing_count > 0
                 else (
-                    TaskStatus.FAILED
-                    if failed_count > 0
+                    TaskStatus.PENDING
+                    if pending_count > 0
                     else (
-                        TaskStatus.PROCESSING
-                        if processing_count > 0
-                        else TaskStatus.COMPLETED
+                        TaskStatus.FAILED if failed_count > 0 else TaskStatus.COMPLETED
                     )
                 )
             )

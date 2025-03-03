@@ -14,8 +14,10 @@ interface HealthResponse {
         api: HealthStatus;
         rabbitmq: HealthStatus;
         elasticsearch: HealthStatus;
-        queue_consumers: number;
-        queue_messages: number;
+        task_queue_consumers: number;
+        task_queue_messages: number;
+        batch_queue_consumers: number;
+        batch_queue_messages: number;
     };
     error: string | null;
 }
@@ -208,25 +210,55 @@ export default function DashboardPage() {
                         <FaTasks className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm">Messages in Queue:</p>
-                                <div className="text-xl font-bold">
-                                    {loading ? (
-                                        <Skeleton className="h-6 w-10" />
-                                    ) : (
-                                        health?.services.queue_messages || 0
-                                    )}
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="font-medium mb-1">Task Queue</h3>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm">Messages:</p>
+                                        <div className="text-xl font-bold">
+                                            {loading ? (
+                                                <Skeleton className="h-6 w-10" />
+                                            ) : (
+                                                health?.services.task_queue_messages || 0
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm">Consumers:</p>
+                                        <div className="text-xl font-bold">
+                                            {loading ? (
+                                                <Skeleton className="h-6 w-10" />
+                                            ) : (
+                                                health?.services.task_queue_consumers || 0
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm">Active Consumers:</p>
-                                <div className="text-xl font-bold">
-                                    {loading ? (
-                                        <Skeleton className="h-6 w-10" />
-                                    ) : (
-                                        health?.services.queue_consumers || 0
-                                    )}
+                            <div>
+                                <h3 className="font-medium mb-1">Batch Queue</h3>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm">Messages:</p>
+                                        <div className="text-xl font-bold">
+                                            {loading ? (
+                                                <Skeleton className="h-6 w-10" />
+                                            ) : (
+                                                health?.services.batch_queue_messages || 0
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm">Consumers:</p>
+                                        <div className="text-xl font-bold">
+                                            {loading ? (
+                                                <Skeleton className="h-6 w-10" />
+                                            ) : (
+                                                health?.services.batch_queue_consumers || 0
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -141,7 +141,7 @@ export default function BatchesPage() {
                         {batch.completed_tasks} / {batch.total_tasks}
                       </TableCell>
                       <TableCell onClick={() => navigateToBatchDetail(batch.batch_id)}>
-                        {getStatusBadge(batch.status, batch.completed_tasks, batch.total_tasks)}
+                        {getStatusBadge(batch.batch_status, batch.completed_tasks, batch.total_tasks)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

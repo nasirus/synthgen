@@ -2,7 +2,7 @@
 export interface Batch {
   batch_id: string;
   created_at: string;
-  status: string;
+  batch_status: string;
   total_tasks: number;
   completed_tasks: number;
   failed_tasks?: number;
@@ -86,3 +86,6 @@ export interface TaskStats {
   prompt_tokens: number;
   completion_tokens: number;
 } 
+
+// Define the task status type for better consistency
+export type TaskStatus = "COMPLETED" | "FAILED" | "PROCESSING" | "PENDING";

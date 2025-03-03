@@ -13,7 +13,9 @@ import { AlertCircle, ArrowLeft, CheckCircle, Clock, BarChart } from "lucide-rea
 import { formatDistanceToNow } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Batch, Task } from "@/lib/types";
+import { Batch, Task, TaskStatus } from "@/lib/types";
+import { StatusBadge } from "@/components/ui/status-badge";
+
 
 export default function BatchDetailPage({ params }: { params: { batchId: string } }) {
   // Unwrap params using React.use()
@@ -26,15 +28,27 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
   const [tasksLoading, setTasksLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
-  const [taskStatus, setTaskStatus] = useState("COMPLETED");
+  // Use the TaskStatus type for better type safety
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>("COMPLETED");
   const router = useRouter();
+
+  // Add debug logging when component mounts
+  useEffect(() => {
+    console.log("Initial taskStatus state:", taskStatus);
+  }, []);
 
   const fetchBatch = async () => {
     try {
       setLoading(true);
       const response = await batchesService.getBatch(batchId);
+      
+      // Just set the batch data directly
       setBatch(response.data);
       setError(null);
+      
+      // Debug the status
+      console.log("Batch data received:", response.data);
+      console.log("Batch status:", response.data.batch_status);
     } catch (err: any) {
       setError(err.message || "Failed to fetch batch details");
       console.error("Error fetching batch:", err);
@@ -43,11 +57,14 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
     }
   };
 
-  const fetchTasks = async (status: string) => {
+  const fetchTasks = async (status: TaskStatus) => {
     try {
+      console.log("fetchTasks called with status:", status);
+      console.log("Current taskStatus state in fetchTasks:", taskStatus);
       setTasksLoading(true);
       const response = await batchesService.getBatchTasks(batchId, status);
       setTasks(response.data.tasks || []);
+      console.log("Tasks fetched for status:", status, "Count:", response.data.tasks?.length || 0);
     } catch (err: any) {
       console.error("Error fetching tasks:", err);
     } finally {
@@ -61,12 +78,22 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
 
   useEffect(() => {
     if (activeTab === "tasks") {
+      console.log("Tasks tab useEffect triggered with taskStatus:", taskStatus);
       fetchTasks(taskStatus);
     }
   }, [activeTab, taskStatus, batchId]);
 
-  const handleStatusChange = (status: string) => {
+  // Add a dedicated useEffect hook to track taskStatus changes
+  useEffect(() => {
+    console.log("taskStatus changed to:", taskStatus);
+  }, [taskStatus]);
+
+  const handleStatusChange = (status: TaskStatus) => {
+    console.log("handleStatusChange called with new status:", status);
+    console.log("Previous taskStatus:", taskStatus);
     setTaskStatus(status);
+    // Log the new status in the next render cycle
+    setTimeout(() => console.log("taskStatus after update (setTimeout):", taskStatus), 0);
   };
 
   const navigateToStats = () => {
@@ -78,15 +105,30 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
   };
 
   const getStatusBadge = (status: string) => {
-    if (status === "COMPLETED") {
-      return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Completed</Badge>;
-    } else if (status === "FAILED") {
-      return <Badge className="bg-red-500"><AlertCircle className="w-3 h-3 mr-1" /> Failed</Badge>;
-    } else if (status === "PROCESSING") {
-      return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Processing</Badge>;
+    console.log("getStatusBadge called with batch_status:", status);
+    
+    // Make sure status is one of the valid values
+    let validStatus: TaskStatus;
+    
+    if (status === "COMPLETED" || status === "FAILED" || status === "PROCESSING" || status === "PENDING") {
+      validStatus = status as TaskStatus;
     } else {
-      return <Badge className="bg-blue-500"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
+      // If for some reason we get an invalid status, make a logical fallback decision
+      console.warn("Invalid batch_status received:", status);
+      
+      // If all tasks are completed, show as COMPLETED
+      if (batch && batch.completed_tasks === batch.total_tasks && batch.total_tasks > 0) {
+        console.log("Setting to COMPLETED based on completed_tasks count");
+        validStatus = "COMPLETED";
+      } else {
+        validStatus = "PENDING";
+      }
     }
+    
+    console.log("Using batch_status for badge:", validStatus);
+    
+    // Using our StatusBadge component
+    return <StatusBadge status={validStatus} />;
   };
 
   const calculateProgress = () => {
@@ -153,7 +195,16 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Status</p>
-                      <div className="mt-1">{getStatusBadge(batch.status)}</div>
+                      <div className="mt-1">
+                        {/* Use batch_status directly */}
+                        {getStatusBadge(batch.batch_status)}
+                        {/* Add debug info */}
+                        {process.env.NODE_ENV === 'development' && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Raw status: {batch.batch_status}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Progress</p>
@@ -272,33 +323,38 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                         size="sm"
                         onClick={() => handleStatusChange("COMPLETED")}
                       >
-                        Completed
+                        <CheckCircle className="w-3 h-3 mr-1" /> Completed
                       </Button>
                       <Button 
                         variant={taskStatus === "FAILED" ? "default" : "outline"} 
                         size="sm"
                         onClick={() => handleStatusChange("FAILED")}
                       >
-                        Failed
+                        <AlertCircle className="w-3 h-3 mr-1" /> Failed
                       </Button>
                       <Button 
                         variant={taskStatus === "PROCESSING" ? "default" : "outline"} 
                         size="sm"
                         onClick={() => handleStatusChange("PROCESSING")}
                       >
-                        Processing
+                        <Clock className="w-3 h-3 mr-1" /> Processing
                       </Button>
                       <Button 
                         variant={taskStatus === "PENDING" ? "default" : "outline"} 
                         size="sm"
                         onClick={() => handleStatusChange("PENDING")}
                       >
-                        Pending
+                        <Clock className="w-3 h-3 mr-1" /> Pending
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Debug info for current status */}
+                  <div className="mb-2 text-sm text-muted-foreground">
+                    Current filter: <code>{taskStatus}</code>
+                  </div>
+                  
                   {tasksLoading ? (
                     <div className="space-y-2">
                       {[...Array(5)].map((_, i) => (

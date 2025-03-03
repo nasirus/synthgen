@@ -204,14 +204,14 @@ async def get_batch(
 
         # Calculate batch status
         batch_status = (
-            TaskStatus.PENDING
-            if batch_stats["pending_count"] > 0
+            TaskStatus.PROCESSING
+            if batch_stats["processing_count"] > 0
             else (
-                TaskStatus.FAILED
-                if batch_stats["failed_count"] > 0
+                TaskStatus.PENDING
+                if batch_stats["pending_count"] > 0
                 else (
-                    TaskStatus.PROCESSING
-                    if batch_stats["processing_count"] > 0
+                    TaskStatus.FAILED
+                    if batch_stats["failed_count"] > 0
                     else TaskStatus.COMPLETED
                 )
             )

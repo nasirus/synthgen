@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { healthService, batchesService } from "@/services/api";
-import { FaCheck, FaExclamationTriangle, FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
+import { FaCheck, FaExclamationTriangle, FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type HealthStatus = "healthy" | "unhealthy";
@@ -282,31 +282,37 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Completed:</p>
                                 <div className="flex items-center">
-                                    <FaCheckCircle className="mr-2 h-4 w-4 text-green-500" />
                                     <div className="text-xl font-bold">
                                         {loading ? <Skeleton className="h-6 w-10" /> : batchStats.completed}
                                     </div>
+                                    <FaCheckCircle className="ml-2 h-4 w-4 text-green-500" />
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Failed:</p>
                                 <div className="flex items-center">
-                                    <FaTimesCircle className="mr-2 h-4 w-4 text-red-500" />
                                     <div className="text-xl font-bold">
                                         {loading ? <Skeleton className="h-6 w-10" /> : batchStats.failed}
                                     </div>
+                                    <FaTimesCircle className="ml-2 h-4 w-4 text-red-500" />
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Pending:</p>
-                                <div className="text-xl font-bold">
-                                    {loading ? <Skeleton className="h-6 w-10" /> : batchStats.pending}
+                                <div className="flex items-center">
+                                    <div className="text-xl font-bold">
+                                        {loading ? <Skeleton className="h-6 w-10" /> : batchStats.pending}
+                                    </div>
+                                    <FaHourglassHalf className="ml-2 h-4 w-4 text-yellow-500" />
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Processing:</p>
-                                <div className="text-xl font-bold">
-                                    {loading ? <Skeleton className="h-6 w-10" /> : batchStats.processing}
+                                <div className="flex items-center">
+                                    <div className="text-xl font-bold">
+                                        {loading ? <Skeleton className="h-6 w-10" /> : batchStats.processing}
+                                    </div>
+                                    <FaSpinner className="ml-2 h-4 w-4 text-blue-500" />
                                 </div>
                             </div>
                         </div>

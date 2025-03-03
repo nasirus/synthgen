@@ -4,7 +4,6 @@ import { Header } from "@/components/layout/header";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { AuthProvider } from "@/contexts/auth-context";
 
 export default function DashboardLayout({
   children,

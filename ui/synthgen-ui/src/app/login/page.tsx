@@ -34,7 +34,8 @@ export default function LoginPage() {
             login(apiKey.trim());
             router.push("/dashboard");
         } catch (error) {
-            setError("Invalid API Key");
+            console.error("Login error:", error);
+            setError(error instanceof Error ? error.message : "Invalid API Key");
         }
     };
 
@@ -55,22 +56,22 @@ export default function LoginPage() {
                     </CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmit}>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <div className="relative">
+                    <CardContent className="space-y-4 pb-2">
+                        <div className="space-y-2 flex flex-col items-center">
+                            <div className="relative w-full max-w-3xs">
                                 <Input
                                     type="password"
                                     placeholder="Enter your API key"
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
-                                    className="pl-10 text-center"
+                                    className="pl-8 text-center h-9"
                                 />
                             </div>
-                            {error && <p className="text-sm text-destructive">{error}</p>}
+                            {error && <p className="text-sm text-destructive mt-2">{error}</p>}
                         </div>
                     </CardContent>
-                    <CardFooter>
-                        <Button type="submit" className="w-full">
+                    <CardFooter className="pt-1 pb-4 flex justify-center">
+                        <Button type="submit" className="w-full max-w-3xs h-9">
                             Log In
                         </Button>
                     </CardFooter>

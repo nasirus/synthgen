@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { healthService, batchesService } from "@/services/api";
 import { FaCheck, FaExclamationTriangle, FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +25,25 @@ interface BatchStats {
     completed: number;
     failed: number;
     pending: number;
+    processing: number;
+}
+
+// Add this interface to define the Batch type
+interface Batch {
+    batch_status: "FAILED" | "PENDING" | "PROCESSING" | "COMPLETED";
+    // Add other batch properties as needed
+}
+
+// Add these interfaces for typing error responses
+interface RequestError {
+    request: unknown;
+}
+
+interface ResponseError {
+    response: {
+        status: number;
+        data: unknown;
+    };
 }
 
 export default function DashboardPage() {
@@ -36,6 +55,7 @@ export default function DashboardPage() {
         completed: 0,
         failed: 0,
         pending: 0,
+        processing: 0,
     });
 
     useEffect(() => {
@@ -43,7 +63,7 @@ export default function DashboardPage() {
             try {
                 setLoading(true);
                 console.log("Attempting to fetch from API at:", process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002');
-                
+
                 const response = await healthService.getHealthCheck();
                 console.log("API response received:", response.data);
                 setHealth(response.data);
@@ -54,27 +74,35 @@ export default function DashboardPage() {
                 const batches = batchesResponse.data.batches;
 
                 // Calculate batch statistics
-                const stats = {
+                const stats: BatchStats = {
                     total: batches.length,
-                    completed: batches.filter((b: any) => b.batch_status === "COMPLETED").length,
-                    failed: batches.filter((b: any) => b.batch_status === "FAILED").length,
-                    pending: batches.filter((b: any) => b.batch_status === "PENDING" || b.batch_status === "PROCESSING").length,
+                    completed: batches.filter((b: Batch) => b.batch_status === "COMPLETED").length,
+                    failed: batches.filter((b: Batch) => b.batch_status === "FAILED").length,
+                    pending: batches.filter((b: Batch) => b.batch_status === "PENDING").length,
+                    processing: batches.filter((b: Batch) => b.batch_status === "PROCESSING").length,
                 };
 
                 setBatchStats(stats);
                 setError(null);
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error("API request failed with error:", err);
-                if (err.request) {
-                    console.error("No response received from server. Request details:", err.request);
+                
+                // Type guard for checking request property
+                if (err && typeof err === 'object' && 'request' in err) {
+                    console.error("No response received from server. Request details:", (err as RequestError).request);
                 }
-                if (err.response) {
-                    console.error("Server responded with error. Status:", err.response.status, "Data:", err.response.data);
+                
+                // Type guard for checking response property
+                if (err && typeof err === 'object' && 'response' in err) {
+                    const errorWithResponse = err as ResponseError;
+                    console.error("Server responded with error. Status:", errorWithResponse.response.status, "Data:", errorWithResponse.response.data);
                 }
-                if (err.message) {
-                    console.error("Error message:", err.message);
-                }
-                setError(`Failed to fetch data: ${err.message || "Unknown error"}`);
+                
+                // Check for message property (standard Error objects have this)
+                const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+                console.error("Error message:", errorMessage);
+                
+                setError(`Failed to fetch data: ${errorMessage}`);
             } finally {
                 setLoading(false);
             }
@@ -235,6 +263,18 @@ export default function DashboardPage() {
                                     <div className="text-xl font-bold">
                                         {loading ? <Skeleton className="h-6 w-10" /> : batchStats.failed}
                                     </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Pending:</p>
+                                <div className="text-xl font-bold">
+                                    {loading ? <Skeleton className="h-6 w-10" /> : batchStats.pending}
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Processing:</p>
+                                <div className="text-xl font-bold">
+                                    {loading ? <Skeleton className="h-6 w-10" /> : batchStats.processing}
                                 </div>
                             </div>
                         </div>

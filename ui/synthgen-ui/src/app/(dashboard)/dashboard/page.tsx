@@ -88,22 +88,22 @@ export default function DashboardPage() {
                 setError(null);
             } catch (err: unknown) {
                 console.error("API request failed with error:", err);
-                
+
                 // Type guard for checking request property
                 if (err && typeof err === 'object' && 'request' in err) {
                     console.error("No response received from server. Request details:", (err as RequestError).request);
                 }
-                
+
                 // Type guard for checking response property
                 if (err && typeof err === 'object' && 'response' in err) {
                     const errorWithResponse = err as ResponseError;
                     console.error("Server responded with error. Status:", errorWithResponse.response.status, "Data:", errorWithResponse.response.data);
                 }
-                
+
                 // Check for message property (standard Error objects have this)
                 const errorMessage = err instanceof Error ? err.message : 'Unknown error';
                 console.error("Error message:", errorMessage);
-                
+
                 setError(`Failed to fetch data: ${errorMessage}`);
             } finally {
                 setLoading(false);
@@ -129,10 +129,6 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-            </div>
-
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* API Status Card */}
                 <Card>
@@ -282,37 +278,37 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Completed:</p>
                                 <div className="flex items-center">
-                                    <div className="text-xl font-bold">
+                                    <div className="text-xl font-bold flex items-center">
                                         {loading ? <Skeleton className="h-6 w-10" /> : batchStats.completed}
                                     </div>
-                                    <FaCheckCircle className="ml-2 h-4 w-4 text-green-500" />
+                                    <FaCheckCircle className="ml-2 h-4 w-4 text-green-500 self-center pt-0.5" />
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Failed:</p>
                                 <div className="flex items-center">
-                                    <div className="text-xl font-bold">
+                                    <div className="text-xl font-bold flex items-center">
                                         {loading ? <Skeleton className="h-6 w-10" /> : batchStats.failed}
                                     </div>
-                                    <FaTimesCircle className="ml-2 h-4 w-4 text-red-500" />
+                                    <FaTimesCircle className="ml-2 h-4 w-4 text-red-500 self-center pt-0.5" />
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Pending:</p>
                                 <div className="flex items-center">
-                                    <div className="text-xl font-bold">
+                                    <div className="text-xl font-bold flex items-center">
                                         {loading ? <Skeleton className="h-6 w-10" /> : batchStats.pending}
                                     </div>
-                                    <FaHourglassHalf className="ml-2 h-4 w-4 text-yellow-500" />
+                                    <FaHourglassHalf className="ml-2 h-4 w-4 text-yellow-500 self-center pt-0.5" />
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Processing:</p>
                                 <div className="flex items-center">
-                                    <div className="text-xl font-bold">
+                                    <div className="text-xl font-bold flex items-center">
                                         {loading ? <Skeleton className="h-6 w-10" /> : batchStats.processing}
                                     </div>
-                                    <FaSpinner className="ml-2 h-4 w-4 text-blue-500" />
+                                    <FaSpinner className="ml-2 h-4 w-4 text-blue-500 self-center pt-0.5" />
                                 </div>
                             </div>
                         </div>

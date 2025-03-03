@@ -207,21 +207,41 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            <div>
-                                <h3 className="font-medium mb-1">Task Queue</h3>
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm">Messages:</p>
-                                        <div className="text-xl font-bold">
+                            {/* Task Queue */}
+                            <div className="rounded-lg border bg-card p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="font-medium text-sm flex items-center">
+                                        <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
+                                        Task Queue
+                                    </h3>
+                                    {(health?.services?.task_queue_consumers || 0) > 0 ? (
+                                        <span className="bg-green-500/20 text-green-600 dark:text-green-400 text-xs px-2 py-1 rounded-full">
+                                            Active
+                                        </span>
+                                    ) : (
+                                        <span className="bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs px-2 py-1 rounded-full">
+                                            Idle
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-accent/50 rounded p-2">
+                                        <p className="text-xs text-muted-foreground">Messages</p>
+                                        <div className="text-xl font-bold flex items-center">
                                             {loading ? (
                                                 <Skeleton className="h-6 w-10" />
                                             ) : (
-                                                health?.services.task_queue_messages || 0
+                                                <div className="flex items-center">
+                                                    {health?.services.task_queue_messages || 0}
+                                                    {(health?.services.task_queue_messages || 0) > 0 && (
+                                                        <span className="ml-1.5 text-xs animate-pulse text-amber-500">●</span>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm">Consumers:</p>
+                                    <div className="bg-accent/50 rounded p-2">
+                                        <p className="text-xs text-muted-foreground">Consumers</p>
                                         <div className="text-xl font-bold">
                                             {loading ? (
                                                 <Skeleton className="h-6 w-10" />
@@ -232,21 +252,42 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             </div>
-                            <div>
-                                <h3 className="font-medium mb-1">Batch Queue</h3>
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm">Messages:</p>
-                                        <div className="text-xl font-bold">
+                            
+                            {/* Batch Queue */}
+                            <div className="rounded-lg border bg-card p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="font-medium text-sm flex items-center">
+                                        <div className="w-2 h-2 rounded-full bg-purple-500 mr-2"></div>
+                                        Batch Queue
+                                    </h3>
+                                    {(health?.services?.batch_queue_consumers || 0) > 0 ? (
+                                        <span className="bg-green-500/20 text-green-600 dark:text-green-400 text-xs px-2 py-1 rounded-full">
+                                            Active
+                                        </span>
+                                    ) : (
+                                        <span className="bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs px-2 py-1 rounded-full">
+                                            Idle
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-accent/50 rounded p-2">
+                                        <p className="text-xs text-muted-foreground">Messages</p>
+                                        <div className="text-xl font-bold flex items-center">
                                             {loading ? (
                                                 <Skeleton className="h-6 w-10" />
                                             ) : (
-                                                health?.services.batch_queue_messages || 0
+                                                <div className="flex items-center">
+                                                    {health?.services.batch_queue_messages || 0}
+                                                    {(health?.services.batch_queue_messages || 0) > 0 && (
+                                                        <span className="ml-1.5 text-xs animate-pulse text-amber-500">●</span>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm">Consumers:</p>
+                                    <div className="bg-accent/50 rounded p-2">
+                                        <p className="text-xs text-muted-foreground">Consumers</p>
                                         <div className="text-xl font-bold">
                                             {loading ? (
                                                 <Skeleton className="h-6 w-10" />

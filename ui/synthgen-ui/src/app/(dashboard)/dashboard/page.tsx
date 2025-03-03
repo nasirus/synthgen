@@ -390,14 +390,14 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Total:</p>
                                 <div className="text-xl font-bold">
-                                    {loading ? <Skeleton className="h-6 w-10" /> : taskStats.total_tasks}
+                                    {loading ? <Skeleton className="h-6 w-10" /> : taskStats.total_tasks.toLocaleString()}
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
                                 <p className="text-sm">Completed:</p>
                                 <div className="flex items-center">
                                     <div className="text-xl font-bold flex items-center">
-                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.completed_tasks}
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.completed_tasks.toLocaleString()}
                                     </div>
                                     <FaCheckCircle className="ml-2 h-4 w-4 text-green-500 self-center pt-0.5" />
                                 </div>
@@ -406,7 +406,7 @@ export default function DashboardPage() {
                                 <p className="text-sm">Failed:</p>
                                 <div className="flex items-center">
                                     <div className="text-xl font-bold flex items-center">
-                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.failed_tasks}
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.failed_tasks.toLocaleString()}
                                     </div>
                                     <FaTimesCircle className="ml-2 h-4 w-4 text-red-500 self-center pt-0.5" />
                                 </div>
@@ -415,7 +415,7 @@ export default function DashboardPage() {
                                 <p className="text-sm">Cached:</p>
                                 <div className="flex items-center">
                                     <div className="text-xl font-bold flex items-center">
-                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.cached_tasks}
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.cached_tasks.toLocaleString()}
                                     </div>
                                     <FaFileAlt className="ml-2 h-4 w-4 text-purple-500 self-center pt-0.5" />
                                 </div>
@@ -424,7 +424,7 @@ export default function DashboardPage() {
                                 <p className="text-sm">Processing:</p>
                                 <div className="flex items-center">
                                     <div className="text-xl font-bold flex items-center">
-                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.processing_tasks}
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.processing_tasks.toLocaleString()}
                                     </div>
                                     <FaSpinner className="ml-2 h-4 w-4 text-blue-500 self-center pt-0.5" />
                                 </div>
@@ -433,7 +433,7 @@ export default function DashboardPage() {
                                 <p className="text-sm">Pending:</p>
                                 <div className="flex items-center">
                                     <div className="text-xl font-bold flex items-center">
-                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.pending_tasks}
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.pending_tasks.toLocaleString()}
                                     </div>
                                     <FaHourglassHalf className="ml-2 h-4 w-4 text-yellow-500 self-center pt-0.5" />
                                 </div>

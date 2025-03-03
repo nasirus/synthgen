@@ -61,4 +61,7 @@ export const tasksService = {
   deleteTask: async (messageId: string) => {
     return apiClient.delete(`/api/v1/tasks/${messageId}`);
   },
+  getTaskStats: async () => {
+    return apiClient.get(`/api/v1/tasks/stats`);
+  },
 }; 

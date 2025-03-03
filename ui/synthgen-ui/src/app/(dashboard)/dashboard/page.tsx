@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { healthService, batchesService } from "@/services/api";
-import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner } from "react-icons/fa";
+import { healthService, batchesService, tasksService } from "@/services/api";
+import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner, FaRobot, FaFileAlt, FaCoins } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type HealthStatus = "healthy" | "unhealthy";
@@ -28,6 +28,19 @@ interface BatchStats {
     failed: number;
     pending: number;
     processing: number;
+}
+
+// Add TaskStatsResponse interface
+interface TaskStatsResponse {
+    total_tasks: number;
+    completed_tasks: number;
+    failed_tasks: number;
+    cached_tasks: number;
+    processing_tasks: number;
+    pending_tasks: number;
+    total_tokens: number;
+    prompt_tokens: number;
+    completion_tokens: number;
 }
 
 // Add this interface to define the Batch type
@@ -59,6 +72,18 @@ export default function DashboardPage() {
         pending: 0,
         processing: 0,
     });
+    // Add task stats state
+    const [taskStats, setTaskStats] = useState<TaskStatsResponse>({
+        total_tasks: 0,
+        completed_tasks: 0,
+        failed_tasks: 0,
+        cached_tasks: 0,
+        processing_tasks: 0,
+        pending_tasks: 0,
+        total_tokens: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+    });
 
     useEffect(() => {
         const fetchHealthData = async () => {
@@ -85,6 +110,12 @@ export default function DashboardPage() {
                 };
 
                 setBatchStats(stats);
+
+                // Fetch task statistics
+                const taskStatsResponse = await tasksService.getTaskStats();
+                console.log("Task stats received:", taskStatsResponse.data);
+                setTaskStats(taskStatsResponse.data);
+                
                 setError(null);
             } catch (err: unknown) {
                 console.error("API request failed with error:", err);
@@ -342,6 +373,78 @@ export default function DashboardPage() {
                                         {loading ? <Skeleton className="h-6 w-10" /> : batchStats.processing}
                                     </div>
                                     <FaSpinner className="ml-2 h-4 w-4 text-blue-500 self-center pt-0.5" />
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Tasks Stats Card */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Tasks</CardTitle>
+                        <FaRobot className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Total:</p>
+                                <div className="text-xl font-bold">
+                                    {loading ? <Skeleton className="h-6 w-10" /> : taskStats.total_tasks}
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Completed:</p>
+                                <div className="flex items-center">
+                                    <div className="text-xl font-bold flex items-center">
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.completed_tasks}
+                                    </div>
+                                    <FaCheckCircle className="ml-2 h-4 w-4 text-green-500 self-center pt-0.5" />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Failed:</p>
+                                <div className="flex items-center">
+                                    <div className="text-xl font-bold flex items-center">
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.failed_tasks}
+                                    </div>
+                                    <FaTimesCircle className="ml-2 h-4 w-4 text-red-500 self-center pt-0.5" />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Cached:</p>
+                                <div className="flex items-center">
+                                    <div className="text-xl font-bold flex items-center">
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.cached_tasks}
+                                    </div>
+                                    <FaFileAlt className="ml-2 h-4 w-4 text-purple-500 self-center pt-0.5" />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Processing:</p>
+                                <div className="flex items-center">
+                                    <div className="text-xl font-bold flex items-center">
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.processing_tasks}
+                                    </div>
+                                    <FaSpinner className="ml-2 h-4 w-4 text-blue-500 self-center pt-0.5" />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Pending:</p>
+                                <div className="flex items-center">
+                                    <div className="text-xl font-bold flex items-center">
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.pending_tasks}
+                                    </div>
+                                    <FaHourglassHalf className="ml-2 h-4 w-4 text-yellow-500 self-center pt-0.5" />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm">Total Tokens:</p>
+                                <div className="flex items-center">
+                                    <div className="text-xl font-bold flex items-center">
+                                        {loading ? <Skeleton className="h-6 w-10" /> : taskStats.total_tokens.toLocaleString()}
+                                    </div>
+                                    <FaCoins className="ml-2 h-4 w-4 text-amber-500 self-center pt-0.5" />
                                 </div>
                             </div>
                         </div>

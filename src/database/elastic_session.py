@@ -429,7 +429,7 @@ class ElasticsearchClient:
         result = await self.client.delete_by_query(index="events", body=query)
         return result.get("deleted", 0)
 
-    async def get_usage_stats(
+    async def get_batch_usage_stats(
         self, batch_id: str, time_range: str = "24h", interval: str = "1h"
     ) -> Dict[str, Any]:
         """
@@ -595,6 +595,30 @@ class ElasticsearchClient:
             logger.error(f"Error retrieving usage statistics: {str(e)}")
             raise
 
+    async def get_tasks_usage_stats(self) -> Dict[str, Any]:
+        """
+        Get usage statistics for all tasks.
+        """
+        query = {
+            "size": 0,
+            "aggs": {
+                "total_tasks": {"value_count": {"field": "message_id"}},
+                "completed_tasks": {"filter": {"term": {"status": "COMPLETED"}}},
+                "failed_tasks": {"filter": {"term": {"status": "FAILED"}}},
+                "cached_tasks": {"filter": {"term": {"cached": True}}},
+                "processing_tasks": {"filter": {"term": {"status": "PROCESSING"}}},
+                "pending_tasks": {"filter": {"term": {"status": "PENDING"}}},
+                "total_tokens": {"sum": {"field": "completions.usage.total_tokens"}},
+                "prompt_tokens": {"sum": {"field": "completions.usage.prompt_tokens"}},
+                "completion_tokens": {
+                    "sum": {"field": "completions.usage.completion_tokens"}
+                },
+            },
+        }
+
+        result = await self.client.search(index="events", body=query)
+
+        return result["aggregations"]
 
 # Create a global instance
 es_client = ElasticsearchClient()

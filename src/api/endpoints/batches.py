@@ -422,7 +422,7 @@ async def get_batch_usage_stats(
         # Validate the time_range parameter
         TimeRange(time_range=time_range)
 
-        stats = await es_client.get_usage_stats(
+        stats = await es_client.get_batch_usage_stats(
             batch_id=batch_id, time_range=time_range, interval=interval
         )
 

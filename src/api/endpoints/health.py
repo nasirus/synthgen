@@ -14,8 +14,10 @@ class ServiceStatus(BaseModel):
     api: HealthStatus = HealthStatus.HEALTHY
     rabbitmq: HealthStatus = HealthStatus.UNHEALTHY
     elasticsearch: HealthStatus = HealthStatus.UNHEALTHY
-    queue_consumers: int = 0
-    queue_messages: int = 0
+    task_queue_consumers: int = 0
+    task_queue_messages: int = 0
+    batch_queue_consumers: int = 0
+    batch_queue_messages: int = 0
 
 
 class HealthResponse(BaseModel):
@@ -42,10 +44,15 @@ async def health_check():
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
 
-        # Get queue information
-        queue_info = channel.queue_declare(queue="data_generation_tasks", passive=True)
-        services.queue_messages = queue_info.method.message_count
-        services.queue_consumers = queue_info.method.consumer_count
+        # Get data_generation_tasks queue information
+        data_generation_tasks_queue_info = channel.queue_declare(queue="data_generation_tasks", passive=True)
+        services.task_queue_messages = data_generation_tasks_queue_info.method.message_count
+        services.task_queue_consumers = data_generation_tasks_queue_info.method.consumer_count
+
+        # Get data_generation_batch queue information
+        data_generation_batch_queue_info = channel.queue_declare(queue="data_generation_batch", passive=True)
+        services.batch_queue_messages = data_generation_batch_queue_info.method.message_count
+        services.batch_queue_consumers = data_generation_batch_queue_info.method.consumer_count
 
         connection.close()
         services.rabbitmq = HealthStatus.HEALTHY

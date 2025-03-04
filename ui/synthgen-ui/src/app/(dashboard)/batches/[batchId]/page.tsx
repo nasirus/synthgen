@@ -87,73 +87,71 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="container p-0 mx-auto">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center">
-          <Button variant="ghost" onClick={navigateBack} className="mr-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Batches
+          <Button variant="ghost" onClick={navigateBack} className="mr-2 p-2">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="ml-1">Back</span>
           </Button>
         </div>
         <RefreshControl />
       </div>
 
       {batchError && (
-        <Card className="mb-6 border-red-500">
-          <CardContent className="pt-6">
+        <Card className="mb-2 border-red-500">
+          <CardContent className="p-2">
             <div className="flex items-center text-red-500">
-              <AlertCircle className="mr-2" />
-              <p>{batchError.message || "Failed to fetch batch details"}</p>
+              <AlertCircle className="mr-2 h-4 w-4" />
+              <p className="text-sm">{batchError.message || "Failed to fetch batch details"}</p>
             </div>
           </CardContent>
         </Card>
       )}
 
       {batchLoading ? (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-1/3" />
-              <Skeleton className="h-4 w-1/4 mt-2" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-20 w-full" />
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-3 gap-2">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
         </div>
       ) : batch ? (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="h-full flex flex-col">
-              <CardHeader>
-                <CardTitle>Batch Information</CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1">
-                <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            {/* Batch Information Card */}
+            <Card className="h-auto">
+              <CardHeader className="p-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Batch Information</CardTitle>
+                  
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Batch ID</p>
-                    <p className="text-lg font-semibold">{batch.batch_id}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Created At</p>
-                    <p className="text-lg font-semibold">{new Date(batch.created_at).toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(batch.created_at), { addSuffix: true })}
+                    <p className="text-xs font-medium text-muted-foreground">Duration</p>
+                    <p className="font-semibold">
+                      {batch.duration ? (() => {
+                        const totalSeconds = batch.duration;
+                        const hours = Math.floor(totalSeconds / 3600);
+                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                        const seconds = totalSeconds % 60;
+                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                      })() : '00:00:00'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Status</p>
+                    <p className="text-xs font-medium text-muted-foreground">Status</p>
                     <div className="mt-1">
-                      {/* Use batch_status directly */}
                       {getStatusBadge(batch.batch_status as TaskStatus)}
                     </div>
                   </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="grid grid-cols-1 gap-2">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Progress</p>
-                    <div className="mt-2">
+                    <p className="text-xs font-medium text-muted-foreground">Progress</p>
+                    <div className="mt-1">
                       <Progress value={calculateProgress()} className="h-2" />
                       <p className="text-xs text-muted-foreground mt-1">
-                        {batch.completed_tasks + batch.cached_tasks} / {batch.total_tasks} tasks completed ({Math.round(calculateProgress())}%)
+                        {batch.completed_tasks + batch.cached_tasks} / {batch.total_tasks} tasks ({Math.round(calculateProgress())}%)
                       </p>
                     </div>
                   </div>
@@ -161,97 +159,115 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
               </CardContent>
             </Card>
 
-            <Card className="h-full flex flex-col">
-              <CardHeader>
-                <CardTitle>Task Statistics</CardTitle>
+            {/* Task Statistics Card */}
+            <Card className="h-auto">
+              <CardHeader className="p-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Task Statistics</CardTitle>
+                  <Button
+                    onClick={navigateToStats}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <BarChart className="mr-1 h-3 w-3" />
+                    View Statistics
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col">
-                <div className="space-y-4 flex-1">
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
-                      <p className="text-3xl font-bold">{batch.total_tasks.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
-                      <p className="text-3xl font-bold text-purple-500">
-                        {batch.pending_tasks?.toLocaleString() || "0"}
-                      </p>
-                    </div>
+              <CardContent className="p-3 pt-0">
+                <div className="grid grid-cols-6 gap-2">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Total</p>
+                    <p className="text-lg font-bold">{batch.total_tasks.toLocaleString()}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
-                      <p className="text-3xl font-bold text-green-500">{batch.completed_tasks.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Failed Tasks</p>
-                      <p className="text-3xl font-bold text-red-500">{batch.failed_tasks?.toLocaleString() || "0"}</p>
-                    </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Pending</p>
+                    <p className="text-lg font-bold text-purple-500">
+                      {batch.pending_tasks?.toLocaleString() || "0"}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Cached Tasks</p>
-                      <p className="text-3xl font-bold text-blue-500">
-                        {batch.cached_tasks?.toLocaleString() || "0"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Processing Tasks</p>
-                      <p className="text-2xl font-bold text-amber-500">{batch.processing_tasks?.toLocaleString() || '0'}</p>
-                    </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Completed</p>
+                    <p className="text-lg font-bold text-green-500">{batch.completed_tasks.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Failed</p>
+                    <p className="text-lg font-bold text-red-500">{batch.failed_tasks?.toLocaleString() || "0"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Cached</p>
+                    <p className="text-lg font-bold text-blue-500">
+                      {batch.cached_tasks?.toLocaleString() || "0"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Processing</p>
+                    <p className="text-lg font-bold text-amber-500">{batch.processing_tasks?.toLocaleString() || '0'}</p>
                   </div>
                 </div>
-                <Button
-                  onClick={navigateToStats}
-                  className="w-full mt-6"
-                  variant="outline"
-                >
-                  <BarChart className="mr-2 h-4 w-4" />
-                  View Detailed Statistics
-                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Token Statistics Card - NEW */}
+            <Card className="h-auto">
+              <CardHeader className="p-3">
+                <CardTitle className="text-base">Token Statistics</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Total Tokens</p>
+                    <p className="text-lg font-bold">{batch.total_tokens?.toLocaleString() || '0'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Prompt Tokens</p>
+                    <p className="font-bold">{batch.prompt_tokens?.toLocaleString() || '0'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {batch.total_tokens ?
+                        `${Math.round((batch.prompt_tokens || 0) / batch.total_tokens * 100)}%` : '0%'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Completion Tokens</p>
+                    <p className="font-bold">{batch.completion_tokens?.toLocaleString() || '0'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {batch.total_tokens ?
+                        `${Math.round((batch.completion_tokens || 0) / batch.total_tokens * 100)}%` : '0%'}
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-2">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
             </TabsList>
-            <TabsContent value="overview">
+
+            <TabsContent value="overview" className="m-0 p-0">
               <Card>
-                <CardHeader>
-                  <CardTitle>Batch Overview</CardTitle>
-                  <CardDescription>Summary of the batch processing</CardDescription>
+                <CardHeader className="p-3">
+                  <CardTitle className="text-base">Batch Overview</CardTitle>
+                  <CardDescription className="text-xs">Summary of the batch processing</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
+                <CardContent className="p-3 pt-0">
+                  <div className="space-y-3">
+                    {/* Timeline section */}
                     <div>
-                      <h3 className="text-lg font-medium mb-4">Timeline</h3>
-                      <div className="grid grid-cols-4 gap-6">
+                      <h3 className="text-sm font-medium mb-2">Timeline</h3>
+                      <div className="grid grid-cols-3 gap-3 text-sm">
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Duration</p>
-                          <p className="text-2xl font-bold">
-                            {batch.duration ? (() => {
-                              const totalSeconds = batch.duration;
-                              const hours = Math.floor(totalSeconds / 3600);
-                              const minutes = Math.floor((totalSeconds % 3600) / 60);
-                              const seconds = totalSeconds % 60;
-                              return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                            })() : '00:00:00'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Created At</p>
-                          <p className="text-2xl font-bold">{new Date(batch.created_at).toLocaleString()}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Created At</p>
+                          <p className="text-base font-bold">{new Date(batch.created_at).toLocaleString()}</p>
                           <p className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(batch.created_at), { addSuffix: true })}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Started At</p>
-                          <p className="text-2xl font-bold">
+                          <p className="text-xs font-medium text-muted-foreground">Started At</p>
+                          <p className="text-base font-bold">
                             {batch.started_at ? new Date(batch.started_at).toLocaleString() : 'N/A'}
                           </p>
                           {batch.started_at && (
@@ -261,8 +277,8 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Completed At</p>
-                          <p className="text-2xl font-bold">
+                          <p className="text-xs font-medium text-muted-foreground">Completed At</p>
+                          <p className="text-base font-bold">
                             {batch.completed_at ? new Date(batch.completed_at).toLocaleString() : 'N/A'}
                           </p>
                           {batch.completed_at && (
@@ -273,63 +289,47 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Token Consumption</h3>
-                      <div className="grid grid-cols-4 gap-6">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Total Tokens</p>
-                          <p className="text-2xl font-bold">{batch.total_tokens?.toLocaleString() || '0'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Prompt Tokens</p>
-                          <p className="text-2xl font-bold">{batch.prompt_tokens?.toLocaleString() || '0'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Completion Tokens</p>
-                          <p className="text-2xl font-bold">{batch.completion_tokens?.toLocaleString() || '0'}</p>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Check for model_config as a property of any type on batch */}
+                    {/* Model configuration and metadata in collapsible sections */}
                     {(batch as any).model_config && (
-                      <div>
-                        <h3 className="text-lg font-medium mb-4">Model Configuration</h3>
-                        <div className="bg-secondary/50 rounded-lg p-4">
-                          <pre className="text-sm overflow-auto whitespace-pre-wrap">
+                      <details className="text-sm">
+                        <summary className="cursor-pointer font-medium mb-1">Model Configuration</summary>
+                        <div className="bg-secondary/50 rounded-lg p-2">
+                          <pre className="text-xs overflow-auto whitespace-pre-wrap max-h-20">
                             {JSON.stringify((batch as any).model_config, null, 2)}
                           </pre>
                         </div>
-                      </div>
+                      </details>
                     )}
 
-                    {/* Check for metadata as a property of any type on batch */}
                     {(batch as any).metadata && (
-                      <div>
-                        <h3 className="text-lg font-medium mb-4">Metadata</h3>
-                        <div className="bg-secondary/50 rounded-lg p-4">
-                          <pre className="text-sm overflow-auto whitespace-pre-wrap">
+                      <details className="text-sm">
+                        <summary className="cursor-pointer font-medium mb-1">Metadata</summary>
+                        <div className="bg-secondary/50 rounded-lg p-2">
+                          <pre className="text-xs overflow-auto whitespace-pre-wrap max-h-20">
                             {JSON.stringify((batch as any).metadata, null, 2)}
                           </pre>
                         </div>
-                      </div>
+                      </details>
                     )}
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="tasks">
+
+            <TabsContent value="tasks" className="m-0 p-0">
               <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
+                <CardHeader className="p-3">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                     <div>
-                      <CardTitle>Tasks</CardTitle>
-                      <CardDescription>List of tasks in this batch</CardDescription>
+                      <CardTitle className="text-base">Tasks</CardTitle>
+                      <CardDescription className="text-xs">List of tasks in this batch</CardDescription>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-1">
                       <Button
                         variant={taskStatus === "COMPLETED" ? "default" : "outline"}
                         size="sm"
+                        className="h-7 text-xs px-2"
                         onClick={() => handleStatusChange("COMPLETED")}
                       >
                         <CheckCircle className="w-3 h-3 mr-1" /> Completed
@@ -337,6 +337,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       <Button
                         variant={taskStatus === "FAILED" ? "default" : "outline"}
                         size="sm"
+                        className="h-7 text-xs px-2"
                         onClick={() => handleStatusChange("FAILED")}
                       >
                         <AlertCircle className="w-3 h-3 mr-1" /> Failed
@@ -344,6 +345,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       <Button
                         variant={taskStatus === "PROCESSING" ? "default" : "outline"}
                         size="sm"
+                        className="h-7 text-xs px-2"
                         onClick={() => handleStatusChange("PROCESSING")}
                       >
                         <Clock className="w-3 h-3 mr-1" /> Processing
@@ -351,6 +353,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       <Button
                         variant={taskStatus === "PENDING" ? "default" : "outline"}
                         size="sm"
+                        className="h-7 text-xs px-2"
                         onClick={() => handleStatusChange("PENDING")}
                       >
                         <Clock className="w-3 h-3 mr-1" /> Pending
@@ -358,74 +361,75 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  {/* updating indicator */}
-                  <div className="mb-2 flex justify-between items-center">
-                    {tasksValidating && (
-                      <Badge variant="outline" className="ml-4 text-xs bg-blue-500/10">
-                        Updating tasks...
-                      </Badge>
-                    )}
-                  </div>
+                <CardContent className="p-2">
+                  {/* Updating indicator */}
+                  {tasksValidating && (
+                    <Badge variant="outline" className="mb-1 text-xs bg-blue-500/10">
+                      Updating tasks...
+                    </Badge>
+                  )}
+
                   {tasksLoading ? (
-                    <div className="space-y-2">
-                      {[...Array(5)].map((_, i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
+                    <div className="space-y-1">
+                      {[...Array(3)].map((_, i) => (
+                        <Skeleton key={i} className="h-8 w-full" />
                       ))}
                     </div>
                   ) : tasksError ? (
-                    <div className="text-center py-8">
-                      <AlertCircle className="mx-auto h-8 w-8 text-red-500 mb-2" />
-                      <p className="text-muted-foreground">Error loading tasks</p>
+                    <div className="text-center py-4">
+                      <AlertCircle className="mx-auto h-6 w-6 text-red-500 mb-1" />
+                      <p className="text-xs text-muted-foreground">Error loading tasks</p>
                     </div>
                   ) : tasks.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">No {taskStatus.toLowerCase()} tasks found</p>
+                    <div className="text-center py-4">
+                      <p className="text-xs text-muted-foreground">No {taskStatus.toLowerCase()} tasks found</p>
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Task ID</TableHead>
-                          <TableHead>Completed At</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Duration</TableHead>
-                          <TableHead>Total Tokens</TableHead>
-                          <TableHead>Prompt Tokens</TableHead>
-                          <TableHead>Completion Tokens</TableHead>
-                          <TableHead>Is Cached</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {tasks.map((task) => (
-                          <TableRow key={task.message_id}>
-                            <TableCell className="font-medium">{task.message_id}</TableCell>
-                            <TableCell>
-                              {task.completed_at ? new Date(task.completed_at).toLocaleString() : 'N/A'}
-                              <div className="text-xs text-muted-foreground">
-                                {task.completed_at ? formatDistanceToNow(new Date(task.completed_at), { addSuffix: true }) : 'N/A'}
-                              </div>
-                            </TableCell>
-                            <TableCell>{getStatusBadge(task.status as TaskStatus)}</TableCell>
-                            <TableCell>
-                              {task.duration ? `${(task.duration / 1000).toFixed(2)}s` : 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                              {task.completions?.usage?.total_tokens || 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                              {task.completions?.usage?.prompt_tokens || 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                              {task.completions?.usage?.completion_tokens || 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                              {task.cached ? <CheckCircle className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
-                            </TableCell>
+                    <div className="overflow-auto max-h-[calc(100vh-24rem)]">
+                      <Table className="text-xs">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Task ID</TableHead>
+                            <TableHead>Completed</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Duration</TableHead>
+                            <TableHead>Total Tokens</TableHead>
+                            <TableHead>Prompt</TableHead>
+                            <TableHead>Completion</TableHead>
+                            <TableHead>Cached</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {tasks.map((task) => (
+                            <TableRow key={task.message_id}>
+                              <TableCell className="font-medium py-2 whitespace-nowrap">{task.message_id}</TableCell>
+                              <TableCell className="py-2 whitespace-nowrap">
+                                {task.completed_at ? new Date(task.completed_at).toLocaleString() : 'N/A'}
+                                <div className="text-xs text-muted-foreground">
+                                  {task.completed_at ? formatDistanceToNow(new Date(task.completed_at), { addSuffix: true }) : 'N/A'}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-2">{getStatusBadge(task.status as TaskStatus)}</TableCell>
+                              <TableCell className="py-2">
+                                {task.duration ? `${(task.duration / 1000).toFixed(2)}s` : 'N/A'}
+                              </TableCell>
+                              <TableCell className="py-2">
+                                {task.completions?.usage?.total_tokens || 'N/A'}
+                              </TableCell>
+                              <TableCell className="py-2">
+                                {task.completions?.usage?.prompt_tokens || 'N/A'}
+                              </TableCell>
+                              <TableCell className="py-2">
+                                {task.completions?.usage?.completion_tokens || 'N/A'}
+                              </TableCell>
+                              <TableCell className="py-2">
+                                {task.cached ? <CheckCircle className="w-3 h-3 text-green-500" /> : <XCircle className="w-3 h-3 text-red-500" />}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -434,9 +438,9 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
         </div>
       ) : (
         <Card>
-          <CardContent className="pt-6 flex flex-col items-center justify-center h-40">
-            <AlertCircle className="h-10 w-10 text-red-500 mb-4" />
-            <p className="text-muted-foreground text-lg">Batch not found</p>
+          <CardContent className="p-4 flex flex-col items-center justify-center h-32">
+            <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
+            <p className="text-muted-foreground">Batch not found</p>
           </CardContent>
         </Card>
       )}

@@ -49,6 +49,14 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
   const [interval, setInterval] = useState("1h");
   const router = useRouter();
 
+  // Define chart config for Tasks Over Time chart
+  const taskChartConfig = {
+    total_tasks: {
+      label: "Tasks",
+      color: "hsl(var(--chart-1))",
+    },
+  } satisfies ChartConfig;
+
   const fetchStats = async () => {
     try {
       setLoading(true);
@@ -255,17 +263,18 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             </Card>
           </div>
 
-          <Card className="bg-black border-gray-800">
+          <Card>
             <CardHeader>
               <CardTitle>Tasks Over Time</CardTitle>
               <CardDescription>
                 Number of tasks processed over the selected time period
               </CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px]">
+            <CardContent>
               {stats.time_series.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
+                <ChartContainer config={taskChartConfig} className="aspect-auto h-[250px] w-full">
+                  <BarChart 
+                    accessibilityLayer 
                     data={stats.time_series.map(point => ({
                       ...point,
                       timestamp: new Date(point.timestamp).toLocaleTimeString([], { 
@@ -274,60 +283,44 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                         hour12: false
                       })
                     }))}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                   >
-                    <defs>
-                      <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#9d4edd" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#9d4edd" stopOpacity={0.8} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      tickLine={false} 
-                      axisLine={false}
-                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-                      tickMargin={5}
-                    />
-                    <YAxis 
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="timestamp"
                       tickLine={false}
+                      tickMargin={10}
                       axisLine={false}
-                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-                      tickMargin={5}
-                      domain={[0, 'dataMax + 100']}
                     />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#111',
-                        border: '1px solid #333',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}
-                      itemStyle={{ color: '#9d4edd' }}
-                      labelStyle={{ color: 'white' }}
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
                     />
                     <Bar 
                       dataKey="total_tasks" 
-                      fill="url(#purpleGradient)" 
-                      radius={[0, 0, 0, 0]}
-                      name="Tasks"
-                      barSize={40}
+                      fill="var(--color-total_tasks)" 
+                      radius={8} 
                     />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               ) : (
-                <div className="flex items-center justify-center h-full border border-dashed border-gray-800 rounded-md">
+                <div className="flex items-center justify-center h-[300px] border border-dashed rounded-md">
                   <div className="text-center">
-                    <p className="mt-2 text-gray-400">
+                    <p className="mt-2 text-muted-foreground">
                       No data available for the selected time range
                     </p>
                   </div>
                 </div>
               )}
             </CardContent>
-            <CardFooter className="text-xs text-gray-400">
-              Showing task distribution over time with {interval} intervals
+            <CardFooter className="flex-col items-start gap-2 text-sm">
+              {stats.summary.total_tasks > 0 && (
+                <div className="flex gap-2 font-medium leading-none">
+                  {stats.summary.total_tasks.toLocaleString()} total tasks processed
+                </div>
+              )}
+              <div className="leading-none text-muted-foreground">
+                Showing task distribution over time with {interval} intervals
+              </div>
             </CardFooter>
           </Card>
 

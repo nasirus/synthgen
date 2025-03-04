@@ -578,13 +578,17 @@ class ElasticsearchClient:
                     else 0
                 )
 
+                cached_tasks = bucket["cached_tasks"]["doc_count"]
+                completed_tasks = bucket["completed_tasks"]["doc_count"]
+                failed_tasks = bucket["failed_tasks"]["doc_count"]
+                total_tasks = bucket["doc_count"]
                 time_series.append(
                     {
                         "timestamp": bucket["key_as_string"],
-                        "total_tasks": bucket["doc_count"],
-                        "completed_tasks": bucket["completed_tasks"]["doc_count"],
-                        "failed_tasks": bucket["failed_tasks"]["doc_count"],
-                        "cached_tasks": bucket["cached_tasks"]["doc_count"],
+                        "total_tasks": total_tasks,
+                        "completed_tasks": completed_tasks - cached_tasks,
+                        "failed_tasks": failed_tasks,
+                        "cached_tasks": cached_tasks,
                         "total_tokens": bucket["total_tokens"]["value"] or 0,
                         "prompt_tokens": bucket["prompt_tokens"]["value"] or 0,
                         "completion_tokens": completion_tokens,

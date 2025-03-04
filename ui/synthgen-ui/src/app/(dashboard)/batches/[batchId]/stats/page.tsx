@@ -31,6 +31,8 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent
 } from "@/components/ui/chart";
 
 // Import a charting library like Chart.js or Recharts
@@ -51,10 +53,18 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
 
   // Define chart config for Tasks Over Time chart
   const taskChartConfig = {
-    total_tasks: {
-      label: "Tasks",
-      color: "hsl(var(--chart-1))",
+    completed_tasks: {
+      label: "Completed",
+      color: "hsl(142.1 76.2% 36.3%)",  // green-500
     },
+    failed_tasks: {
+      label: "Failed",
+      color: "hsl(0 84.2% 60.2%)",  // red-500
+    },
+    cached_tasks: {
+      label: "Cached",
+      color: "hsl(280 100% 70%)",  // purple-500
+    }
   } satisfies ChartConfig;
 
   const fetchStats = async () => {
@@ -291,19 +301,30 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                       tickMargin={10}
                       axisLine={false}
                     />
-                    <ChartTooltip
-                      cursor={false}
-                      content={<ChartTooltipContent hideLabel />}
+                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar 
+                      dataKey="completed_tasks" 
+                      stackId="a"
+                      fill="var(--color-completed_tasks)" 
+                      radius={[0, 0, 4, 4]} 
                     />
                     <Bar 
-                      dataKey="total_tasks" 
-                      fill="var(--color-total_tasks)" 
-                      radius={8} 
+                      dataKey="failed_tasks" 
+                      stackId="a"
+                      fill="var(--color-failed_tasks)" 
+                      radius={[0, 0, 0, 0]} 
+                    />
+                    <Bar 
+                      dataKey="cached_tasks" 
+                      stackId="a"
+                      fill="var(--color-cached_tasks)" 
+                      radius={[4, 4, 0, 0]} 
                     />
                   </BarChart>
                 </ChartContainer>
               ) : (
-                <div className="flex items-center justify-center h-[300px] border border-dashed rounded-md">
+                <div className="flex items-center justify-center h-[250px] border border-dashed rounded-md">
                   <div className="text-center">
                     <p className="mt-2 text-muted-foreground">
                       No data available for the selected time range
@@ -315,7 +336,9 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             <CardFooter className="flex-col items-start gap-2 text-sm">
               {stats.summary.total_tasks > 0 && (
                 <div className="flex gap-2 font-medium leading-none">
-                  {stats.summary.total_tasks.toLocaleString()} total tasks processed
+                  {stats.summary.completed_tasks.toLocaleString()} completed,
+                  {stats.summary.failed_tasks.toLocaleString()} failed,
+                  {stats.summary.cached_tasks.toLocaleString()} cached
                 </div>
               )}
               <div className="leading-none text-muted-foreground">

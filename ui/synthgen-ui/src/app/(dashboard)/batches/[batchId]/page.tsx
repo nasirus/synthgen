@@ -186,42 +186,49 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="h-full flex flex-col">
               <CardHeader>
                 <CardTitle>Task Statistics</CardTitle>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col">
-                <div className="grid grid-cols-2 gap-4 flex-1">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
-                    <p className="text-2xl font-bold">{batch.total_tasks.toLocaleString()}</p>
+                <div className="space-y-4 flex-1">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
+                      <p className="text-3xl font-bold">{batch.total_tasks.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
+                      <p className="text-3xl font-bold text-green-500">{batch.completed_tasks.toLocaleString()}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
-                    <p className="text-2xl font-bold text-green-500">{batch.completed_tasks.toLocaleString()}</p>
+                  
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Failed Tasks</p>
+                      <p className="text-3xl font-bold text-red-500">{batch.failed_tasks?.toLocaleString() || "0"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
+                      <p className="text-3xl font-bold text-blue-500">
+                        {batch.pending_tasks?.toLocaleString() || "0"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Failed Tasks</p>
-                    <p className="text-2xl font-bold text-red-500">{batch.failed_tasks?.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
-                    <p className="text-2xl font-bold text-blue-500">
-                      {batch.pending_tasks?.toLocaleString()}
-                    </p>
-                  </div>
+                  
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Cached Tasks</p>
-                    <p className="text-2xl font-bold text-blue-500">
-                      {batch.cached_tasks?.toLocaleString()}
+                    <p className="text-3xl font-bold text-blue-500">
+                      {batch.cached_tasks?.toLocaleString() || "0"}
                     </p>
                   </div>
                 </div>
+                
                 <Button
                   onClick={navigateToStats}
-                  className="w-full mt-4"
-                  variant="default"
+                  className="w-full mt-6"
+                  variant="outline"
                 >
                   <BarChart className="mr-2 h-4 w-4" />
                   View Detailed Statistics

@@ -15,6 +15,8 @@ import { Batch, Task, TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useBatch, useBatchTasks } from "@/lib/hooks";
 import { Badge } from "@/components/ui/badge";
+import { RefreshControl } from "@/components/ui/refresh-control";
+import { useRefreshContext } from "@/contexts/refresh-context";
 
 export default function BatchDetailPage({ params }: { params: { batchId: string } }) {
   // Unwrap params using React.use()
@@ -25,37 +27,36 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
   // Use the TaskStatus type for better type safety
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("COMPLETED");
   const router = useRouter();
-  
+  const { refreshNow } = useRefreshContext();
+
   // Use SWR hooks for data fetching with auto-refresh
-  const { 
-    data: batch, 
-    error: batchError, 
+  const {
+    data: batch,
+    error: batchError,
     isLoading: batchLoading,
-    isValidating: batchValidating
-  } = useBatch(batchId, {
-    // Refresh interval already set in the hook (10 seconds)
-    // But we can override it here if needed
-    refreshInterval: 5000, // More frequent updates for batches that are actively processing
-  });
-  
-  const { 
-    data: tasksData, 
-    error: tasksError, 
+    isValidating: batchValidating,
+    mutate: refreshBatch
+  } = useBatch(batchId);
+
+  const {
+    data: tasksData,
+    error: tasksError,
     isLoading: tasksLoading,
-    isValidating: tasksValidating
+    isValidating: tasksValidating,
+    mutate: refreshTasks
   } = useBatchTasks(batchId, taskStatus, {
-    // Only fetch tasks when the tasks tab is active
-    refreshInterval: activeTab === "tasks" ? 10000 : 0,
+    // Still use conditional fetching for tasks to reduce API calls
+    refreshInterval: activeTab === "tasks" ? undefined : 0,
   });
-  
+
   // Extract tasks from the response
   const tasks = tasksData?.tasks || [];
 
   // Effect to only fetch tasks when tab is active
   useEffect(() => {
     if (activeTab !== "tasks") return;
-    // No need to manually fetch - SWR handles this
-  }, [activeTab, taskStatus]);
+    refreshTasks();
+  }, [activeTab, taskStatus, refreshTasks]);
 
   const handleStatusChange = (status: TaskStatus) => {
     setTaskStatus(status);
@@ -82,17 +83,15 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
 
   return (
     <div>
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" onClick={navigateBack} className="mr-4">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Batches
-        </Button>
-        <h1 className="text-3xl font-bold">Batch Details</h1>
-        {batchValidating && (
-          <Badge variant="outline" className="ml-4 bg-blue-500/10">
-            Updating...
-          </Badge>
-        )}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Button variant="ghost" onClick={navigateBack} className="mr-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Batches
+          </Button>
+          <h1 className="text-3xl font-bold">Batch Details</h1>
+        </div>
+        <RefreshControl />
       </div>
 
       {batchError && (

@@ -1,5 +1,6 @@
-import useSWR, { SWRConfiguration } from 'swr';
+import useSWR, { SWRConfiguration, useSWRConfig } from 'swr';
 import { apiClient } from '@/services/api';
+import { useRefreshTrigger } from '@/contexts/refresh-context';
 
 // Type for the fetcher function response
 type FetcherResponse<T> = {
@@ -24,9 +25,12 @@ const fetcher = async <T>(url: string): Promise<T> => {
  * @returns The SWR response with data, error, and loading state
  */
 export function useSWRFetch<T>(url: string, config?: SWRConfiguration) {
-  // Default config with 10-second refresh interval
+  // Get refresh settings from context
+  const { refreshInterval } = useRefreshTrigger();
+
+  // Default config with refresh interval from context
   const defaultConfig: SWRConfiguration = {
-    refreshInterval: 10000, // 10 seconds
+    refreshInterval,
     revalidateOnFocus: true,
     dedupingInterval: 2000, // 2 seconds
     ...config,

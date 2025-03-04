@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Trash2, RefreshCw } from "lucide-react";
+import { AlertCircle, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -16,28 +16,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Batch, TaskStatus } from "@/lib/types";
+import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useBatches } from "@/lib/hooks";
 import { batchesService } from "@/services/api";
-import { Badge } from "@/components/ui/badge";
+import { RefreshControl } from "@/components/ui/refresh-control";
+import { useRefreshContext } from "@/contexts/refresh-context";
 
 export default function BatchesPage() {
   const [batchToDelete, setBatchToDelete] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const router = useRouter();
+  const { refreshNow } = useRefreshContext();
 
   // Use SWR hook for auto-refreshing batches
-  const { 
-    data, 
-    error, 
+  const {
+    data,
+    error,
     isLoading,
-    isValidating,
-    mutate: refreshBatches 
-  } = useBatches({
-    refreshInterval: 10000, // 10 seconds
-  });
+    mutate: refreshBatches
+  } = useBatches();
 
   // Extract batches from data
   const batches = data?.batches || [];
@@ -45,14 +44,15 @@ export default function BatchesPage() {
   // Delete batch handler
   const handleDeleteBatch = async () => {
     if (!batchToDelete) return;
-    
+
     try {
       setDeleteLoading(true);
       await batchesService.deleteBatch(batchToDelete);
       setIsDeleteDialogOpen(false);
-      
+
       // Manually trigger a refresh of the data
       refreshBatches();
+      refreshNow();
     } catch (err) {
       console.error("Error deleting batch:", err);
     } finally {
@@ -72,28 +72,12 @@ export default function BatchesPage() {
     router.push(`/batches/${batchId}`);
   };
 
-  // Manually refresh batches
-  const handleRefresh = () => {
-    refreshBatches();
-  };
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Batches</h1>
-        <div className="flex items-center gap-2">
-          {isValidating && (
-            <Badge variant="outline" className="bg-blue-500/10">
-              Updating...
-            </Badge>
-          )}
-          <Button variant="outline" onClick={handleRefresh} disabled={isValidating}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isValidating ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
+        <RefreshControl />
       </div>
-
       {error && (
         <Card className="mb-6 border-red-500">
           <CardContent className="pt-6">
@@ -137,7 +121,7 @@ export default function BatchesPage() {
               <TableBody>
                 {batches.map((batch) => (
                   <TableRow key={batch.batch_id} className="cursor-pointer hover:bg-secondary/50">
-                    <TableCell 
+                    <TableCell
                       className="font-medium"
                       onClick={() => navigateToBatch(batch.batch_id)}
                     >

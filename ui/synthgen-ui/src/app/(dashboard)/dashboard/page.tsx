@@ -1,29 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner, FaRobot, FaFileAlt, FaCoins, FaSync } from "react-icons/fa";
+import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner, FaRobot, FaFileAlt, FaCoins } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHealthCheck, useBatches, useTaskStats } from "@/lib/hooks";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Batch } from "@/lib/types";
-
-type HealthStatus = "healthy" | "unhealthy";
-
-interface HealthResponse {
-    status: HealthStatus;
-    services: {
-        api: HealthStatus;
-        rabbitmq: HealthStatus;
-        elasticsearch: HealthStatus;
-        task_queue_consumers: number;
-        task_queue_messages: number;
-        batch_queue_consumers: number;
-        batch_queue_messages: number;
-    };
-    error: string | null;
-}
+import { RefreshControl } from "@/components/ui/refresh-control";
+import { useRefreshContext } from "@/contexts/refresh-context";
 
 interface BatchStats {
     total: number;
@@ -33,59 +16,23 @@ interface BatchStats {
     processing: number;
 }
 
-// Add TaskStatsResponse interface
-interface TaskStatsResponse {
-    total_tasks: number;
-    completed_tasks: number;
-    failed_tasks: number;
-    cached_tasks: number;
-    processing_tasks: number;
-    pending_tasks: number;
-    total_tokens: number;
-    prompt_tokens: number;
-    completion_tokens: number;
-}
-
-// Add these interfaces for typing error responses
-interface RequestError {
-    request: unknown;
-}
-
-interface ResponseError {
-    response: {
-        status: number;
-        data: unknown;
-    };
-}
-
 export default function DashboardPage() {
     // Use SWR hooks for auto-refreshing data
-    const { 
-        data: health, 
-        error: healthError, 
-        isLoading: healthLoading,
-        isValidating: healthValidating,
-        mutate: refreshHealth
-    } = useHealthCheck({
-        refreshInterval: 5000, // 5 seconds refresh for health data
-    });
-    
-    const { 
-        data: batchesData, 
-        error: batchesError, 
-        isLoading: batchesLoading,
-        isValidating: batchesValidating,
-        mutate: refreshBatches
-    } = useBatches();
-    
-    const { 
-        data: taskStatsData, 
-        error: taskStatsError, 
-        isLoading: taskStatsLoading,
-        isValidating: taskStatsValidating,
-        mutate: refreshTaskStats
-    } = useTaskStats();
-    
+    const {
+        data: health,
+        isLoading: healthLoading } = useHealthCheck();
+
+    const {
+        data: batchesData,
+        isLoading: batchesLoading } = useBatches();
+
+    const {
+        data: taskStatsData,
+        isLoading: taskStatsLoading } = useTaskStats();
+
+    // Get refresh context
+    useRefreshContext();
+
     // Calculate batch statistics from SWR data
     const batchStats: BatchStats = {
         total: batchesData?.batches?.length || 0,
@@ -94,7 +41,7 @@ export default function DashboardPage() {
         pending: batchesData?.batches?.filter((b: Batch) => b.batch_status === "PENDING").length || 0,
         processing: batchesData?.batches?.filter((b: Batch) => b.batch_status === "PROCESSING").length || 0,
     };
-    
+
     // Extract task stats for easier access
     const taskStats = taskStatsData || {
         total_tasks: 0,
@@ -107,37 +54,19 @@ export default function DashboardPage() {
         prompt_tokens: 0,
         completion_tokens: 0,
     };
-    
+
     // Combined loading state
     const loading = healthLoading || batchesLoading || taskStatsLoading;
-    
-    // Manually refresh all data
-    const refreshAllData = () => {
-        refreshHealth();
-        refreshBatches();
-        refreshTaskStats();
-    };
 
-    // Combined validating state for indicating updates
-    const isUpdating = healthValidating || batchesValidating || taskStatsValidating;
+    // Manually refresh all data
 
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold">Dashboard</h1>
-                <div className="flex items-center gap-2">
-                    {isUpdating && (
-                        <Badge variant="outline" className="bg-blue-500/10">
-                            Updating...
-                        </Badge>
-                    )}
-                    <Button variant="outline" onClick={refreshAllData} disabled={isUpdating}>
-                        <FaSync className={`h-4 w-4 mr-2 ${isUpdating ? 'animate-spin' : ''}`} />
-                        Refresh
-                    </Button>
-                </div>
+                <RefreshControl />
             </div>
-            
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* Combined Status Card */}
                 <Card className="col-span-full lg:col-span-3 p-0">
@@ -158,8 +87,8 @@ export default function DashboardPage() {
                                 <div>
                                     <p className="text-sm font-medium">API Server</p>
                                     <div className="text-xs text-muted-foreground">
-                                        {loading ? <Skeleton className="h-4 w-20" /> : 
-                                        health?.services.api?.toUpperCase() || 'UNKNOWN'}
+                                        {loading ? <Skeleton className="h-4 w-20" /> :
+                                            health?.services.api?.toUpperCase() || 'UNKNOWN'}
                                     </div>
                                 </div>
                             </div>
@@ -179,8 +108,8 @@ export default function DashboardPage() {
                                 <div>
                                     <p className="text-sm font-medium">Message Broker</p>
                                     <div className="text-xs text-muted-foreground">
-                                        {loading ? <Skeleton className="h-4 w-20" /> : 
-                                        health?.services.rabbitmq?.toUpperCase() || 'UNKNOWN'}
+                                        {loading ? <Skeleton className="h-4 w-20" /> :
+                                            health?.services.rabbitmq?.toUpperCase() || 'UNKNOWN'}
                                     </div>
                                 </div>
                             </div>
@@ -200,8 +129,8 @@ export default function DashboardPage() {
                                 <div>
                                     <p className="text-sm font-medium">Database</p>
                                     <div className="text-xs text-muted-foreground">
-                                        {loading ? <Skeleton className="h-4 w-20" /> : 
-                                        health?.services.elasticsearch?.toUpperCase() || 'UNKNOWN'}
+                                        {loading ? <Skeleton className="h-4 w-20" /> :
+                                            health?.services.elasticsearch?.toUpperCase() || 'UNKNOWN'}
                                     </div>
                                 </div>
                             </div>
@@ -262,7 +191,7 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {/* Batch Queue */}
                             <div className="rounded-lg border bg-card p-3">
                                 <div className="flex items-center justify-between mb-2">

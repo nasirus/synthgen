@@ -139,7 +139,7 @@ export default function BatchesPage() {
                     <TableCell onClick={() => navigateToBatch(batch.batch_id)}>
                       {Math.round(
                         batch.total_tasks > 0
-                          ? (batch.completed_tasks / batch.total_tasks) * 100
+                          ? ((batch.completed_tasks + batch.cached_tasks) / batch.total_tasks) * 100
                           : 0
                       )}%
                     </TableCell>

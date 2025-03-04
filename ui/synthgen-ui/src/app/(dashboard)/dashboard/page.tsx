@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { healthService, batchesService, tasksService } from "@/services/api";
-import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner, FaRobot, FaFileAlt, FaCoins } from "react-icons/fa";
+import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner, FaRobot, FaFileAlt, FaCoins, FaSync } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useHealthCheck, useBatches, useTaskStats } from "@/lib/hooks";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Batch } from "@/lib/types";
 
 type HealthStatus = "healthy" | "unhealthy";
 
@@ -43,12 +46,6 @@ interface TaskStatsResponse {
     completion_tokens: number;
 }
 
-// Add this interface to define the Batch type
-interface Batch {
-    batch_status: "FAILED" | "PENDING" | "PROCESSING" | "COMPLETED";
-    // Add other batch properties as needed
-}
-
 // Add these interfaces for typing error responses
 interface RequestError {
     request: unknown;
@@ -62,18 +59,44 @@ interface ResponseError {
 }
 
 export default function DashboardPage() {
-    const [health, setHealth] = useState<HealthResponse | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [batchStats, setBatchStats] = useState<BatchStats>({
-        total: 0,
-        completed: 0,
-        failed: 0,
-        pending: 0,
-        processing: 0,
+    // Use SWR hooks for auto-refreshing data
+    const { 
+        data: health, 
+        error: healthError, 
+        isLoading: healthLoading,
+        isValidating: healthValidating,
+        mutate: refreshHealth
+    } = useHealthCheck({
+        refreshInterval: 5000, // 5 seconds refresh for health data
     });
-    // Add task stats state
-    const [taskStats, setTaskStats] = useState<TaskStatsResponse>({
+    
+    const { 
+        data: batchesData, 
+        error: batchesError, 
+        isLoading: batchesLoading,
+        isValidating: batchesValidating,
+        mutate: refreshBatches
+    } = useBatches();
+    
+    const { 
+        data: taskStatsData, 
+        error: taskStatsError, 
+        isLoading: taskStatsLoading,
+        isValidating: taskStatsValidating,
+        mutate: refreshTaskStats
+    } = useTaskStats();
+    
+    // Calculate batch statistics from SWR data
+    const batchStats: BatchStats = {
+        total: batchesData?.batches?.length || 0,
+        completed: batchesData?.batches?.filter((b: Batch) => b.batch_status === "COMPLETED").length || 0,
+        failed: batchesData?.batches?.filter((b: Batch) => b.batch_status === "FAILED").length || 0,
+        pending: batchesData?.batches?.filter((b: Batch) => b.batch_status === "PENDING").length || 0,
+        processing: batchesData?.batches?.filter((b: Batch) => b.batch_status === "PROCESSING").length || 0,
+    };
+    
+    // Extract task stats for easier access
+    const taskStats = taskStatsData || {
         total_tasks: 0,
         completed_tasks: 0,
         failed_tasks: 0,
@@ -83,74 +106,38 @@ export default function DashboardPage() {
         total_tokens: 0,
         prompt_tokens: 0,
         completion_tokens: 0,
-    });
+    };
+    
+    // Combined loading state
+    const loading = healthLoading || batchesLoading || taskStatsLoading;
+    
+    // Manually refresh all data
+    const refreshAllData = () => {
+        refreshHealth();
+        refreshBatches();
+        refreshTaskStats();
+    };
 
-    useEffect(() => {
-        const fetchHealthData = async () => {
-            try {
-                setLoading(true);
-                console.log("Attempting to fetch from API at:", process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002');
-
-                const response = await healthService.getHealthCheck();
-                console.log("API response received:", response.data);
-                setHealth(response.data);
-
-                // Fetch batch statistics
-                const batchesResponse = await batchesService.getBatches();
-                console.log("Batches data received:", batchesResponse.data);
-                const batches = batchesResponse.data.batches;
-
-                // Calculate batch statistics
-                const stats: BatchStats = {
-                    total: batches.length,
-                    completed: batches.filter((b: Batch) => b.batch_status === "COMPLETED").length,
-                    failed: batches.filter((b: Batch) => b.batch_status === "FAILED").length,
-                    pending: batches.filter((b: Batch) => b.batch_status === "PENDING").length,
-                    processing: batches.filter((b: Batch) => b.batch_status === "PROCESSING").length,
-                };
-
-                setBatchStats(stats);
-
-                // Fetch task statistics
-                const taskStatsResponse = await tasksService.getTaskStats();
-                console.log("Task stats received:", taskStatsResponse.data);
-                setTaskStats(taskStatsResponse.data);
-                
-                setError(null);
-            } catch (err: unknown) {
-                console.error("API request failed with error:", err);
-
-                // Type guard for checking request property
-                if (err && typeof err === 'object' && 'request' in err) {
-                    console.error("No response received from server. Request details:", (err as RequestError).request);
-                }
-
-                // Type guard for checking response property
-                if (err && typeof err === 'object' && 'response' in err) {
-                    const errorWithResponse = err as ResponseError;
-                    console.error("Server responded with error. Status:", errorWithResponse.response.status, "Data:", errorWithResponse.response.data);
-                }
-
-                // Check for message property (standard Error objects have this)
-                const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-                console.error("Error message:", errorMessage);
-
-                setError(`Failed to fetch data: ${errorMessage}`);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchHealthData();
-
-        // Refresh health data every 10 seconds
-        const interval = setInterval(fetchHealthData, 10000);
-
-        return () => clearInterval(interval);
-    }, []);
+    // Combined validating state for indicating updates
+    const isUpdating = healthValidating || batchesValidating || taskStatsValidating;
 
     return (
         <div className="space-y-4">
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold">Dashboard</h1>
+                <div className="flex items-center gap-2">
+                    {isUpdating && (
+                        <Badge variant="outline" className="bg-blue-500/10">
+                            Updating...
+                        </Badge>
+                    )}
+                    <Button variant="outline" onClick={refreshAllData} disabled={isUpdating}>
+                        <FaSync className={`h-4 w-4 mr-2 ${isUpdating ? 'animate-spin' : ''}`} />
+                        Refresh
+                    </Button>
+                </div>
+            </div>
+            
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* Combined Status Card */}
                 <Card className="col-span-full lg:col-span-3 p-0">
@@ -451,12 +438,6 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
             </div>
-
-            {error && (
-                <div className="rounded-md bg-destructive/15 p-4 text-destructive">
-                    {error}
-                </div>
-            )}
         </div>
     );
 } 

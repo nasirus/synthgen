@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import React from "react";
 import { useRouter } from "next/navigation";
-import { batchesService } from "@/services/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -14,85 +13,52 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Batch, Task, TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
-
+import { useBatch, useBatchTasks } from "@/lib/hooks";
+import { Badge } from "@/components/ui/badge";
 
 export default function BatchDetailPage({ params }: { params: { batchId: string } }) {
   // Unwrap params using React.use()
   const unwrappedParams = React.use(params as unknown as Promise<{ batchId: string }>);
   const batchId = unwrappedParams.batchId;
 
-  const [batch, setBatch] = useState<Batch | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tasksLoading, setTasksLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   // Use the TaskStatus type for better type safety
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("COMPLETED");
   const router = useRouter();
+  
+  // Use SWR hooks for data fetching with auto-refresh
+  const { 
+    data: batch, 
+    error: batchError, 
+    isLoading: batchLoading,
+    isValidating: batchValidating
+  } = useBatch(batchId, {
+    // Refresh interval already set in the hook (10 seconds)
+    // But we can override it here if needed
+    refreshInterval: 5000, // More frequent updates for batches that are actively processing
+  });
+  
+  const { 
+    data: tasksData, 
+    error: tasksError, 
+    isLoading: tasksLoading,
+    isValidating: tasksValidating
+  } = useBatchTasks(batchId, taskStatus, {
+    // Only fetch tasks when the tasks tab is active
+    refreshInterval: activeTab === "tasks" ? 10000 : 0,
+  });
+  
+  // Extract tasks from the response
+  const tasks = tasksData?.tasks || [];
 
-  // Add debug logging when component mounts
+  // Effect to only fetch tasks when tab is active
   useEffect(() => {
-    console.log("Initial taskStatus state:", taskStatus);
-  }, []);
-
-  const fetchBatch = async () => {
-    try {
-      setLoading(true);
-      const response = await batchesService.getBatch(batchId);
-
-      // Just set the batch data directly
-      setBatch(response.data);
-      setError(null);
-
-      // Debug the status
-      console.log("Batch data received:", response.data);
-      console.log("Batch status:", response.data.batch_status);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch batch details");
-      console.error("Error fetching batch:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchTasks = async (status: TaskStatus) => {
-    try {
-      console.log("fetchTasks called with status:", status);
-      console.log("Current taskStatus state in fetchTasks:", taskStatus);
-      setTasksLoading(true);
-      const response = await batchesService.getBatchTasks(batchId, status);
-      setTasks(response.data.tasks || []);
-      console.log("Tasks fetched for status:", status, "Count:", response.data.tasks?.length || 0);
-    } catch (err: any) {
-      console.error("Error fetching tasks:", err);
-    } finally {
-      setTasksLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchBatch();
-  }, [batchId]);
-
-  useEffect(() => {
-    if (activeTab === "tasks") {
-      console.log("Tasks tab useEffect triggered with taskStatus:", taskStatus);
-      fetchTasks(taskStatus);
-    }
-  }, [activeTab, taskStatus, batchId]);
-
-  // Add a dedicated useEffect hook to track taskStatus changes
-  useEffect(() => {
-    console.log("taskStatus changed to:", taskStatus);
-  }, [taskStatus]);
+    if (activeTab !== "tasks") return;
+    // No need to manually fetch - SWR handles this
+  }, [activeTab, taskStatus]);
 
   const handleStatusChange = (status: TaskStatus) => {
-    console.log("handleStatusChange called with new status:", status);
-    console.log("Previous taskStatus:", taskStatus);
     setTaskStatus(status);
-    // Log the new status in the next render cycle
-    setTimeout(() => console.log("taskStatus after update (setTimeout):", taskStatus), 0);
   };
 
   const navigateToStats = () => {
@@ -122,20 +88,25 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
           Back to Batches
         </Button>
         <h1 className="text-3xl font-bold">Batch Details</h1>
+        {batchValidating && (
+          <Badge variant="outline" className="ml-4 bg-blue-500/10">
+            Updating...
+          </Badge>
+        )}
       </div>
 
-      {error && (
+      {batchError && (
         <Card className="mb-6 border-red-500">
           <CardContent className="pt-6">
             <div className="flex items-center text-red-500">
               <AlertCircle className="mr-2" />
-              <p>{error}</p>
+              <p>{batchError.message || "Failed to fetch batch details"}</p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {loading ? (
+      {batchLoading ? (
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -385,9 +356,16 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Debug info for current status */}
-                  <div className="mb-2 text-sm text-muted-foreground">
-                    Current filter: <code>{taskStatus}</code>
+                  {/* Current filter status and updating indicator */}
+                  <div className="mb-2 flex justify-between items-center">
+                    <div className="text-sm text-muted-foreground">
+                      Current filter: <code>{taskStatus}</code>
+                    </div>
+                    {tasksValidating && (
+                      <Badge variant="outline" className="ml-4 text-xs bg-blue-500/10">
+                        Updating tasks...
+                      </Badge>
+                    )}
                   </div>
 
                   {tasksLoading ? (
@@ -395,6 +373,11 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       {[...Array(5)].map((_, i) => (
                         <Skeleton key={i} className="h-12 w-full" />
                       ))}
+                    </div>
+                  ) : tasksError ? (
+                    <div className="text-center py-8">
+                      <AlertCircle className="mx-auto h-8 w-8 text-red-500 mb-2" />
+                      <p className="text-muted-foreground">Error loading tasks</p>
                     </div>
                   ) : tasks.length === 0 ? (
                     <div className="text-center py-8">

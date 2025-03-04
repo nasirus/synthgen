@@ -27,6 +27,9 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Export the apiClient for use in other modules
+export { apiClient };
+
 // Health check service
 export const healthService = {
   getHealthCheck: async () => {

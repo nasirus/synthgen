@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { batchesService } from "@/services/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Trash2 } from "lucide-react";
+import { AlertCircle, Trash2, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -19,165 +18,172 @@ import {
 } from "@/components/ui/dialog";
 import { Batch, TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useBatches } from "@/lib/hooks";
+import { batchesService } from "@/services/api";
+import { Badge } from "@/components/ui/badge";
 
 export default function BatchesPage() {
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [batchToDelete, setBatchToDelete] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const router = useRouter();
 
-  const fetchBatches = async () => {
-    try {
-      setLoading(true);
-      const response = await batchesService.getBatches();
-      setBatches(response.data.batches || []);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch batches");
-      console.error("Error fetching batches:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use SWR hook for auto-refreshing batches
+  const { 
+    data, 
+    error, 
+    isLoading,
+    isValidating,
+    mutate: refreshBatches 
+  } = useBatches({
+    refreshInterval: 10000, // 10 seconds
+  });
 
-  useEffect(() => {
-    fetchBatches();
-  }, []);
+  // Extract batches from data
+  const batches = data?.batches || [];
 
+  // Delete batch handler
   const handleDeleteBatch = async () => {
     if (!batchToDelete) return;
-
+    
     try {
+      setDeleteLoading(true);
       await batchesService.deleteBatch(batchToDelete);
-      fetchBatches();
       setIsDeleteDialogOpen(false);
-      setBatchToDelete(null);
-    } catch (err: any) {
+      
+      // Manually trigger a refresh of the data
+      refreshBatches();
+    } catch (err) {
       console.error("Error deleting batch:", err);
-      setError(err.message || "Failed to delete batch");
+    } finally {
+      setDeleteLoading(false);
+      setBatchToDelete(null);
     }
   };
 
+  // Open delete dialog
   const confirmDelete = (batchId: string) => {
     setBatchToDelete(batchId);
     setIsDeleteDialogOpen(true);
   };
 
-  const navigateToBatchDetail = (batchId: string) => {
+  // Navigate to batch details
+  const navigateToBatch = (batchId: string) => {
     router.push(`/batches/${batchId}`);
   };
 
-  const navigateToBatchStats = (batchId: string) => {
-    router.push(`/batches/${batchId}/stats`);
-  };
-
-  const getStatusBadge = (status: TaskStatus) => {
-    return <StatusBadge status={status} />;
+  // Manually refresh batches
+  const handleRefresh = () => {
+    refreshBatches();
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Batches</h1>
+        <div className="flex items-center gap-2">
+          {isValidating && (
+            <Badge variant="outline" className="bg-blue-500/10">
+              Updating...
+            </Badge>
+          )}
+          <Button variant="outline" onClick={handleRefresh} disabled={isValidating}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isValidating ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
       {error && (
         <Card className="mb-6 border-red-500">
           <CardContent className="pt-6">
             <div className="flex items-center text-red-500">
               <AlertCircle className="mr-2" />
-              <p>{error}</p>
+              <p>{error.message || "Failed to fetch batches"}</p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {loading ? (
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-1/3" />
-                <Skeleton className="h-4 w-1/4 mt-2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : batches.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6 flex flex-col items-center justify-center h-40">
-            <p className="text-muted-foreground text-lg">No batches found</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6">
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Batch ID</TableHead>
-                    <TableHead>Created At</TableHead>
-                    <TableHead>Tasks</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">All Batches</h2>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : batches.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No batches found</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Batch ID</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Tasks</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {batches.map((batch) => (
+                  <TableRow key={batch.batch_id} className="cursor-pointer hover:bg-secondary/50">
+                    <TableCell 
+                      className="font-medium"
+                      onClick={() => navigateToBatch(batch.batch_id)}
+                    >
+                      {batch.batch_id}
+                    </TableCell>
+                    <TableCell onClick={() => navigateToBatch(batch.batch_id)}>
+                      {new Date(batch.created_at).toLocaleString()}
+                      <div className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(batch.created_at), { addSuffix: true })}
+                      </div>
+                    </TableCell>
+                    <TableCell onClick={() => navigateToBatch(batch.batch_id)}>
+                      <StatusBadge status={batch.batch_status as TaskStatus} />
+                    </TableCell>
+                    <TableCell onClick={() => navigateToBatch(batch.batch_id)}>
+                      {Math.round(
+                        batch.total_tasks > 0
+                          ? (batch.completed_tasks / batch.total_tasks) * 100
+                          : 0
+                      )}%
+                    </TableCell>
+                    <TableCell onClick={() => navigateToBatch(batch.batch_id)}>
+                      <span className="font-semibold">{batch.total_tasks.toLocaleString()}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({batch.completed_tasks.toLocaleString()} completed)
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmDelete(batch.batch_id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {batches.map((batch) => (
-                    <TableRow key={batch.batch_id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell className="font-medium" onClick={() => navigateToBatchDetail(batch.batch_id)}>
-                        {batch.batch_id}
-                      </TableCell>
-                      <TableCell onClick={() => navigateToBatchDetail(batch.batch_id)}>
-                        {new Date(batch.created_at).toLocaleString()}
-                        <div className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(batch.created_at), { addSuffix: true })}
-                        </div>
-                      </TableCell>
-                      <TableCell onClick={() => navigateToBatchDetail(batch.batch_id)}>
-                        {batch.completed_tasks} / {batch.total_tasks}
-                      </TableCell>
-                      <TableCell onClick={() => navigateToBatchDetail(batch.batch_id)}>
-                        {getStatusBadge(batch.batch_status as TaskStatus)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigateToBatchStats(batch.batch_id)}
-                          >
-                            Stats
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigateToBatchDetail(batch.batch_id)}
-                          >
-                            View
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              confirmDelete(batch.batch_id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
@@ -188,11 +194,19 @@ export default function BatchesPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={deleteLoading}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteBatch}>
-              Delete
+            <Button
+              variant="destructive"
+              onClick={handleDeleteBatch}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

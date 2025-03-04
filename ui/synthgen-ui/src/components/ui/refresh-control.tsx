@@ -77,16 +77,18 @@ export function RefreshControl() {
                     </Select>
                 )}
 
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={refreshNow}
-                    disabled={isRefreshing}
-                    className="h-8 w-8"
-                >
-                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    <span className="sr-only">Refresh</span>
-                </Button>
+                {!autoRefresh && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={refreshNow}
+                        disabled={isRefreshing}
+                        className="h-8 w-8"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <span className="sr-only">Refresh</span>
+                    </Button>
+                )}
             </div>
         </div>
     );

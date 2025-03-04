@@ -205,7 +205,6 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       </p>
                     </div>
                   </div>
-                  
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
@@ -216,15 +215,19 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       <p className="text-3xl font-bold text-red-500">{batch.failed_tasks?.toLocaleString() || "0"}</p>
                     </div>
                   </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Cached Tasks</p>
-                    <p className="text-3xl font-bold text-blue-500">
-                      {batch.cached_tasks?.toLocaleString() || "0"}
-                    </p>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Cached Tasks</p>
+                      <p className="text-3xl font-bold text-blue-500">
+                        {batch.cached_tasks?.toLocaleString() || "0"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Processing Tasks</p>
+                      <p className="text-2xl font-bold text-amber-500">{batch.processing_tasks?.toLocaleString() || '0'}</p>
+                    </div>
                   </div>
                 </div>
-                
                 <Button
                   onClick={navigateToStats}
                   className="w-full mt-6"
@@ -249,36 +252,94 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                   <CardDescription>Summary of the batch processing</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
-                      <h3 className="text-lg font-medium">Processing Information</h3>
-                      <div className="grid grid-cols-2 gap-4 mt-2">
+                      <h3 className="text-lg font-medium mb-4">Timeline</h3>
+                      <div className="grid grid-cols-4 gap-6">
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Duration</p>
-                          <p className="text-lg font-semibold">
+                          <p className="text-2xl font-bold">
                             {batch.duration ? (() => {
                               const totalSeconds = batch.duration;
                               const hours = Math.floor(totalSeconds / 3600);
                               const minutes = Math.floor((totalSeconds % 3600) / 60);
                               const seconds = totalSeconds % 60;
                               return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                            })() : 'N/A'}
+                            })() : '00:00:00'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Total Tokens</p>
-                          <p className="text-lg font-semibold">{batch.total_tokens?.toLocaleString() || 'N/A'}</p>
+                          <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                          <p className="text-2xl font-bold">{new Date(batch.created_at).toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(batch.created_at), { addSuffix: true })}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Prompt Tokens</p>
-                          <p className="text-lg font-semibold">{batch.prompt_tokens?.toLocaleString() || 'N/A'}</p>
+                          <p className="text-sm font-medium text-muted-foreground">Started At</p>
+                          <p className="text-2xl font-bold">
+                            {batch.started_at ? new Date(batch.started_at).toLocaleString() : 'N/A'}
+                          </p>
+                          {batch.started_at && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(batch.started_at), { addSuffix: true })}
+                            </p>
+                          )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Completion Tokens</p>
-                          <p className="text-lg font-semibold">{batch.completion_tokens?.toLocaleString() || 'N/A'}</p>
+                          <p className="text-sm font-medium text-muted-foreground">Completed At</p>
+                          <p className="text-2xl font-bold">
+                            {batch.completed_at ? new Date(batch.completed_at).toLocaleString() : 'N/A'}
+                          </p>
+                          {batch.completed_at && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(batch.completed_at), { addSuffix: true })}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Token Consumption</h3>
+                      <div className="grid grid-cols-4 gap-6">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Tokens</p>
+                          <p className="text-2xl font-bold">{batch.total_tokens?.toLocaleString() || '0'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Prompt Tokens</p>
+                          <p className="text-2xl font-bold">{batch.prompt_tokens?.toLocaleString() || '0'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Completion Tokens</p>
+                          <p className="text-2xl font-bold">{batch.completion_tokens?.toLocaleString() || '0'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Check for model_config as a property of any type on batch */}
+                    {(batch as any).model_config && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">Model Configuration</h3>
+                        <div className="bg-secondary/50 rounded-lg p-4">
+                          <pre className="text-sm overflow-auto whitespace-pre-wrap">
+                            {JSON.stringify((batch as any).model_config, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Check for metadata as a property of any type on batch */}
+                    {(batch as any).metadata && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">Metadata</h3>
+                        <div className="bg-secondary/50 rounded-lg p-4">
+                          <pre className="text-sm overflow-auto whitespace-pre-wrap">
+                            {JSON.stringify((batch as any).metadata, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

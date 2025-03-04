@@ -146,7 +146,7 @@ export default function BatchesPage() {
                     <TableCell onClick={() => navigateToBatch(batch.batch_id)}>
                       <span className="font-semibold">{batch.total_tasks.toLocaleString()}</span>
                       <span className="text-xs text-muted-foreground ml-2">
-                        ({batch.completed_tasks.toLocaleString()} completed)
+                        ({batch.completed_tasks.toLocaleString()} completed, {batch.cached_tasks.toLocaleString()} cached)
                       </span>
                     </TableCell>
                     <TableCell>

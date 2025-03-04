@@ -199,21 +199,21 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       <p className="text-3xl font-bold">{batch.total_tasks.toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
-                      <p className="text-3xl font-bold text-green-500">{batch.completed_tasks.toLocaleString()}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
+                      <p className="text-3xl font-bold text-blue-500">
+                        {batch.pending_tasks?.toLocaleString() || "0"}
+                      </p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Failed Tasks</p>
-                      <p className="text-3xl font-bold text-red-500">{batch.failed_tasks?.toLocaleString() || "0"}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
+                      <p className="text-3xl font-bold text-green-500">{batch.completed_tasks.toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
-                      <p className="text-3xl font-bold text-blue-500">
-                        {batch.pending_tasks?.toLocaleString() || "0"}
-                      </p>
+                      <p className="text-sm font-medium text-muted-foreground">Failed Tasks</p>
+                      <p className="text-3xl font-bold text-red-500">{batch.failed_tasks?.toLocaleString() || "0"}</p>
                     </div>
                   </div>
                   

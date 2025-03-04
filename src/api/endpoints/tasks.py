@@ -46,7 +46,7 @@ async def get_task_stats(
         # Transform Elasticsearch aggregation results to match TaskStatsResponse format
         stats = {
             "total_tasks": stats_aggs["total_tasks"]["value"],
-            "completed_tasks": stats_aggs["completed_tasks"]["doc_count"],
+            "completed_tasks": stats_aggs["completed_tasks"]["doc_count"] - stats_aggs["cached_tasks"]["doc_count"],
             "failed_tasks": stats_aggs["failed_tasks"]["doc_count"],
             "cached_tasks": stats_aggs["cached_tasks"]["doc_count"],
             "processing_tasks": stats_aggs["processing_tasks"]["doc_count"],

@@ -287,7 +287,7 @@ class ElasticsearchClient:
             "completed_at": completed_at,
             "duration": duration,
             "total_count": total_count,
-            "completed_count": completed_count,
+            "completed_count": completed_count - aggs["cached_count"]["doc_count"],
             "failed_count": failed_count,
             "pending_count": pending_count,
             "processing_count": processing_count,
@@ -360,7 +360,7 @@ class ElasticsearchClient:
                     "completed_at": completed_at,
                     "duration": duration,
                     "total_tasks": total_count,
-                    "completed_tasks": completed_count,
+                    "completed_tasks": completed_count - bucket["cached_count"]["doc_count"],
                     "failed_tasks": failed_count,
                     "pending_tasks": pending_count,
                     "processing_tasks": processing_count,
@@ -567,7 +567,7 @@ class ElasticsearchClient:
                     "total_tasks": result["hits"]["total"]["value"],
                     "completed_tasks": result["aggregations"]["total_completed"][
                         "doc_count"
-                    ],
+                    ] - result["aggregations"]["total_cached"]["doc_count"],
                     "failed_tasks": result["aggregations"]["total_failed"]["doc_count"],
                     "cached_tasks": result["aggregations"]["total_cached"]["doc_count"],
                     "total_tokens": result["aggregations"]["total_tokens_used"]["value"]

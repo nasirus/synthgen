@@ -2,12 +2,6 @@ import useSWR, { SWRConfiguration, useSWRConfig } from 'swr';
 import { apiClient } from '@/services/api';
 import { useRefreshTrigger } from '@/contexts/refresh-context';
 
-// Type for the fetcher function response
-type FetcherResponse<T> = {
-  data: T;
-  status: number;
-};
-
 // Custom fetcher that works with our API client
 const fetcher = async <T>(url: string): Promise<T> => {
   try {

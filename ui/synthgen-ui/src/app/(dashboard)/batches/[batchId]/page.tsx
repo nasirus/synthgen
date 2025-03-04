@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,17 +53,8 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
     dedupingInterval: 1000,
   });
 
-  // Use useMemo to efficiently sort tasks whenever tasksData changes
-  const sortedTasks = useMemo(() => {
-    if (!tasksData?.tasks) return [];
-
-    // Create a copy and sort by completed_at in descending order
-    return [...tasksData.tasks].sort((a, b) => {
-      if (!a.completed_at) return 1; // If a doesn't have completed_at, it comes after
-      if (!b.completed_at) return -1; // If b doesn't have completed_at, it comes after
-      return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
-    });
-  }, [tasksData]);
+  // Access tasks directly without useMemo since we're not transforming the data
+  const tasks = tasksData?.tasks || [];
 
   // Only fetch tasks when tab is active
   useEffect(() => {
@@ -388,7 +379,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       <AlertCircle className="mx-auto h-8 w-8 text-red-500 mb-2" />
                       <p className="text-muted-foreground">Error loading tasks</p>
                     </div>
-                  ) : sortedTasks.length === 0 ? (
+                  ) : tasks.length === 0 ? (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground">No {taskStatus.toLowerCase()} tasks found</p>
                     </div>
@@ -397,20 +388,20 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       <TableHeader>
                         <TableRow>
                           <TableHead>Task ID</TableHead>
-                          <TableHead>Created At</TableHead>
+                          <TableHead>Completed At</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Duration</TableHead>
                           <TableHead>Tokens</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sortedTasks.map((task) => (
+                        {tasks.map((task) => (
                           <TableRow key={task.message_id}>
                             <TableCell className="font-medium">{task.message_id}</TableCell>
                             <TableCell>
-                              {new Date(task.created_at).toLocaleString()}
+                              {task.completed_at ? new Date(task.completed_at).toLocaleString() : 'N/A'}
                               <div className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+                                {task.completed_at ? formatDistanceToNow(new Date(task.completed_at), { addSuffix: true }) : 'N/A'}
                               </div>
                             </TableCell>
                             <TableCell>{getStatusBadge(task.status as TaskStatus)}</TableCell>

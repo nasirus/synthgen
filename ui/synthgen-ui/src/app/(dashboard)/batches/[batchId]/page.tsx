@@ -357,9 +357,6 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                 <CardContent>
                   {/* Current filter status and updating indicator */}
                   <div className="mb-2 flex justify-between items-center">
-                    <div className="text-sm text-muted-foreground">
-                      Current filter: <code>{taskStatus}</code>
-                    </div>
                     {tasksValidating && (
                       <Badge variant="outline" className="ml-4 text-xs bg-blue-500/10">
                         Updating tasks...

@@ -11,10 +11,9 @@ import { AlertCircle, ArrowLeft, CheckCircle, Clock, BarChart } from "lucide-rea
 import { formatDistanceToNow } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Batch, Task, TaskStatus } from "@/lib/types";
+import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useBatch, useBatchTasks } from "@/lib/hooks";
-import { Badge } from "@/components/ui/badge";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext } from "@/contexts/refresh-context";
 
@@ -77,7 +76,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
   const calculateProgress = () => {
     if (!batch) return 0;
     return batch.total_tasks > 0
-      ? (batch.completed_tasks / batch.total_tasks) * 100
+      ? ((batch.completed_tasks + batch.cached_tasks) / batch.total_tasks) * 100
       : 0;
   };
 
@@ -149,7 +148,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                     <div className="mt-2">
                       <Progress value={calculateProgress()} className="h-2" />
                       <p className="text-xs text-muted-foreground mt-1">
-                        {batch.completed_tasks} / {batch.total_tasks} tasks completed ({Math.round(calculateProgress())}%)
+                        {batch.completed_tasks + batch.cached_tasks} / {batch.total_tasks} tasks completed ({Math.round(calculateProgress())}%)
                       </p>
                     </div>
                   </div>
@@ -355,15 +354,6 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Current filter status and updating indicator */}
-                  <div className="mb-2 flex justify-between items-center">
-                    {tasksValidating && (
-                      <Badge variant="outline" className="ml-4 text-xs bg-blue-500/10">
-                        Updating tasks...
-                      </Badge>
-                    )}
-                  </div>
-
                   {tasksLoading ? (
                     <div className="space-y-2">
                       {[...Array(5)].map((_, i) => (

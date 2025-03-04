@@ -149,84 +149,85 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
         </div>
       ) : batch ? (
         <div className="space-y-6">
-          <div className="flex justify-between">
-            <div className="flex-1 mr-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Batch Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Batch ID</p>
-                      <p className="text-lg font-semibold">{batch.batch_id}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Created At</p>
-                      <p className="text-lg font-semibold">{new Date(batch.created_at).toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(batch.created_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Status</p>
-                      <div className="mt-1">
-                        {/* Use batch_status directly */}
-                        {getStatusBadge(batch.batch_status as TaskStatus)}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Progress</p>
-                      <div className="mt-2">
-                        <Progress value={calculateProgress()} className="h-2" />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {batch.completed_tasks} / {batch.total_tasks} tasks completed ({Math.round(calculateProgress())}%)
-                        </p>
-                      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="h-full flex flex-col">
+              <CardHeader>
+                <CardTitle>Batch Information</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Batch ID</p>
+                    <p className="text-lg font-semibold">{batch.batch_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                    <p className="text-lg font-semibold">{new Date(batch.created_at).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(batch.created_at), { addSuffix: true })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Status</p>
+                    <div className="mt-1">
+                      {/* Use batch_status directly */}
+                      {getStatusBadge(batch.batch_status as TaskStatus)}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-            <div className="flex-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Task Statistics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
-                      <p className="text-2xl font-bold">{batch.total_tasks.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
-                      <p className="text-2xl font-bold text-green-500">{batch.completed_tasks.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Failed Tasks</p>
-                      <p className="text-2xl font-bold text-red-500">{batch.failed_tasks?.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
-                      <p className="text-2xl font-bold text-blue-500">
-                        {batch.pending_tasks?.toLocaleString()}
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Progress</p>
+                    <div className="mt-2">
+                      <Progress value={calculateProgress()} className="h-2" />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {batch.completed_tasks} / {batch.total_tasks} tasks completed ({Math.round(calculateProgress())}%)
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4">
-                    <Button
-                      onClick={navigateToStats}
-                      className="w-full"
-                      variant="outline"
-                    >
-                      <BarChart className="mr-2 h-4 w-4" />
-                      View Detailed Statistics
-                    </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="h-full flex flex-col">
+              <CardHeader>
+                <CardTitle>Task Statistics</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col">
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
+                    <p className="text-2xl font-bold">{batch.total_tasks.toLocaleString()}</p>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
+                    <p className="text-2xl font-bold text-green-500">{batch.completed_tasks.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Failed Tasks</p>
+                    <p className="text-2xl font-bold text-red-500">{batch.failed_tasks?.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
+                    <p className="text-2xl font-bold text-blue-500">
+                      {batch.pending_tasks?.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Cached Tasks</p>
+                    <p className="text-2xl font-bold text-blue-500">
+                      {batch.cached_tasks?.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={navigateToStats}
+                  className="w-full mt-4"
+                  variant="default"
+                >
+                  <BarChart className="mr-2 h-4 w-4" />
+                  View Detailed Statistics
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>

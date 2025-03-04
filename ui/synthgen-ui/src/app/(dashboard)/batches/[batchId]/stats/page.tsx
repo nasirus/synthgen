@@ -201,7 +201,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Cached Tasks</p>
-                    <p className="text-2xl font-bold text-blue-500">{stats.summary.cached_tasks}</p>
+                    <p className="text-2xl font-bold text-purple-500">{stats.summary.cached_tasks}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Tokens</p>

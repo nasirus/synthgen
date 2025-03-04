@@ -170,7 +170,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
-                      <p className="text-3xl font-bold text-blue-500">
+                      <p className="text-3xl font-bold text-purple-500">
                         {batch.pending_tasks?.toLocaleString() || "0"}
                       </p>
                     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from "react";
 
 // Available refresh intervals in milliseconds
 export const REFRESH_INTERVALS = {
@@ -104,10 +104,21 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
     }
   }, [autoRefresh, refreshInterval]);
 
+  // Custom event for manual refresh
+  const triggerManualRefreshEvent = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const event = new CustomEvent("manual-refresh");
+      window.dispatchEvent(event);
+    }
+  }, []);
+
   // Function to trigger manual refresh
   const refreshNow = () => {
     setIsRefreshing(true);
     setRefreshCount(prev => prev + 1);
+    
+    // Trigger the manual refresh event
+    triggerManualRefreshEvent();
 
     // Reset the refreshing indicator after a short delay
     setTimeout(() => {
@@ -136,10 +147,24 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
 export function useRefreshTrigger() {
   const { autoRefresh, refreshInterval, refreshNow } = useRefreshContext();
   const intervalMs = REFRESH_INTERVALS[refreshInterval];
+  const [manualRefreshCounter, setManualRefreshCounter] = useState(0);
+
+  // Listen for manual refresh events
+  useEffect(() => {
+    const handleManualRefresh = () => {
+      setManualRefreshCounter(prev => prev + 1);
+    };
+
+    window.addEventListener("manual-refresh", handleManualRefresh);
+    return () => {
+      window.removeEventListener("manual-refresh", handleManualRefresh);
+    };
+  }, []);
 
   return {
     // Return 0 (disabled) if auto-refresh is off, otherwise return the interval
     refreshInterval: autoRefresh ? intervalMs : 0,
     refreshNow,
+    manualRefreshCounter,
   };
 } 

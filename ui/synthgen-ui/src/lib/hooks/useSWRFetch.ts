@@ -1,6 +1,7 @@
 import useSWR, { SWRConfiguration, useSWRConfig } from 'swr';
 import { apiClient } from '@/services/api';
 import { useRefreshTrigger } from '@/contexts/refresh-context';
+import { useEffect } from 'react';
 
 // Custom fetcher that works with our API client
 const fetcher = async <T>(url: string): Promise<T> => {
@@ -20,7 +21,8 @@ const fetcher = async <T>(url: string): Promise<T> => {
  */
 export function useSWRFetch<T>(url: string, config?: SWRConfiguration) {
   // Get refresh settings from context
-  const { refreshInterval } = useRefreshTrigger();
+  const { refreshInterval, manualRefreshCounter } = useRefreshTrigger();
+  const { cache, mutate } = useSWRConfig();
 
   // Default config with refresh interval from context
   const defaultConfig: SWRConfiguration = {
@@ -30,17 +32,24 @@ export function useSWRFetch<T>(url: string, config?: SWRConfiguration) {
     ...config,
   };
 
-  const { data, error, isLoading, isValidating, mutate } = useSWR<T>(
+  const { data, error, isLoading, isValidating, mutate: boundMutate } = useSWR<T>(
     url,
     fetcher,
     defaultConfig
   );
+
+  // Effect to trigger revalidation when manual refresh is clicked
+  useEffect(() => {
+    if (manualRefreshCounter > 0) {
+      boundMutate();
+    }
+  }, [manualRefreshCounter, boundMutate]);
 
   return {
     data,
     error,
     isLoading,
     isValidating,
-    mutate
+    mutate: boundMutate
   };
 } 

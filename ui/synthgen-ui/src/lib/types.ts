@@ -61,8 +61,10 @@ export interface StatsSummary {
   completed_tasks: number;
   failed_tasks: number;
   cached_tasks: number;
+  processing_tasks: number;
   total_tokens: number;
-  completion_tokens: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
   average_response_time: number;
   tokens_per_second: number;
   cache_hit_rate: number;

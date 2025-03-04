@@ -538,12 +538,16 @@ class ElasticsearchClient:
                 },
                 "total_completed": {"filter": {"term": {"status": "COMPLETED"}}},
                 "total_failed": {"filter": {"term": {"status": "FAILED"}}},
+                "total_processing": {"filter": {"term": {"status": "PROCESSING"}}},
                 "total_cached": {"filter": {"term": {"cached": True}}},
                 "total_tokens_used": {
                     "sum": {"field": "completions.usage.total_tokens"}
                 },
                 "total_completion_tokens": {
                     "sum": {"field": "completions.usage.completion_tokens"}
+                },
+                "total_prompt_tokens": {
+                    "sum": {"field": "completions.usage.prompt_tokens"}
                 },
                 "sum_duration": {
                     "filter": {"term": {"status": "COMPLETED"}},
@@ -619,9 +623,19 @@ class ElasticsearchClient:
                     - result["aggregations"]["total_cached"]["doc_count"],
                     "failed_tasks": result["aggregations"]["total_failed"]["doc_count"],
                     "cached_tasks": result["aggregations"]["total_cached"]["doc_count"],
+                    "processing_tasks": result["aggregations"]["total_processing"][
+                        "doc_count"
+                    ],
+                    "total_prompt_tokens": result["aggregations"][
+                        "total_prompt_tokens"
+                    ]["value"]
+                    or 0,
+                    "total_completion_tokens": result["aggregations"][
+                        "total_completion_tokens"
+                    ]["value"]
+                    or 0,
                     "total_tokens": result["aggregations"]["total_tokens_used"]["value"]
                     or 0,
-                    "completion_tokens": total_completion_tokens,
                     "average_response_time": round(
                         result["aggregations"]["avg_response_time"]["value"] or 0
                     ),

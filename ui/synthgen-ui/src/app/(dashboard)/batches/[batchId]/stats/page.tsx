@@ -20,7 +20,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
   // Unwrap params using React.use()
   const unwrappedParams = React.use(params as unknown as Promise<{ batchId: string }>);
   const batchId = unwrappedParams.batchId;
-  
+
   const [stats, setStats] = useState<UsageStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -176,8 +176,8 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
           ))}
         </div>
       ) : stats ? (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Summary</CardTitle>
@@ -186,7 +186,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-5 gap-4">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
                     <p className="text-2xl font-bold">{stats.summary.total_tasks}</p>
@@ -204,12 +204,20 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                     <p className="text-2xl font-bold text-purple-500">{stats.summary.cached_tasks}</p>
                   </div>
                   <div>
+                    <p className="text-sm font-medium text-muted-foreground">Processing Tasks</p>
+                    <p className="text-2xl font-bold text-amber-500">{stats.summary.processing_tasks}</p>
+                  </div>
+                  <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Tokens</p>
                     <p className="text-2xl font-bold">{stats.summary.total_tokens.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Completion Tokens</p>
-                    <p className="text-2xl font-bold">{stats.summary.completion_tokens.toLocaleString()}</p>
+                    <p className="text-2xl font-bold">{stats.summary.total_completion_tokens.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Prompt Tokens</p>
+                    <p className="text-2xl font-bold">{stats.summary.total_prompt_tokens.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Avg Response Time</p>
@@ -220,35 +228,6 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Tokens/Second</p>
                     <p className="text-2xl font-bold">{stats.summary.tokens_per_second.toFixed(2)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Cache Performance</CardTitle>
-                <CardDescription>
-                  Cache hit rate and performance metrics
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center h-full">
-                  <div className="text-center mb-4">
-                    <p className="text-sm font-medium text-muted-foreground">Cache Hit Rate</p>
-                    <p className="text-5xl font-bold text-blue-500">
-                      {(stats.summary.cache_hit_rate * 100).toFixed(1)}%
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 w-full">
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-muted-foreground">Cached Tasks</p>
-                      <p className="text-2xl font-bold">{stats.summary.cached_tasks}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
-                      <p className="text-2xl font-bold">{stats.summary.total_tasks}</p>
-                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -294,8 +273,8 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                     Chart showing token usage over time would be displayed here
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Total tokens: {stats.summary.total_tokens.toLocaleString()}, 
-                    Completion tokens: {stats.summary.completion_tokens.toLocaleString()}
+                    Total tokens: {stats.summary.total_tokens.toLocaleString()},
+                    Completion tokens: {stats.summary.total_completion_tokens.toLocaleString()},
                   </p>
                 </div>
               </div>
@@ -318,7 +297,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                     Chart showing performance metrics over time would be displayed here
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Average response time: {(stats.summary.average_response_time / 1000).toFixed(2)}s, 
+                    Average response time: {(stats.summary.average_response_time / 1000).toFixed(2)}s,
                     Tokens per second: {stats.summary.tokens_per_second.toFixed(2)}
                   </p>
                 </div>
@@ -344,6 +323,8 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                       <th className="text-right py-2 px-4">Failed</th>
                       <th className="text-right py-2 px-4">Cached</th>
                       <th className="text-right py-2 px-4">Total Tokens</th>
+                      <th className="text-right py-2 px-4">Prompt Tokens</th>
+                      <th className="text-right py-2 px-4">Completion Tokens</th>
                       <th className="text-right py-2 px-4">Avg Duration (ms)</th>
                       <th className="text-right py-2 px-4">Tokens/Second</th>
                     </tr>
@@ -354,12 +335,14 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                         <td className="py-2 px-4">
                           {new Date(point.timestamp).toLocaleString()}
                         </td>
-                        <td className="text-right py-2 px-4">{point.total_tasks}</td>
-                        <td className="text-right py-2 px-4">{point.completed_tasks}</td>
-                        <td className="text-right py-2 px-4">{point.failed_tasks}</td>
-                        <td className="text-right py-2 px-4">{point.cached_tasks}</td>
-                        <td className="text-right py-2 px-4">{point.total_tokens}</td>
-                        <td className="text-right py-2 px-4">{point.avg_duration_ms}</td>
+                        <td className="text-right py-2 px-4">{point.total_tasks.toLocaleString()}</td>
+                        <td className="text-right py-2 px-4">{point.completed_tasks.toLocaleString()}</td>
+                        <td className="text-right py-2 px-4">{point.failed_tasks.toLocaleString()}</td>
+                        <td className="text-right py-2 px-4">{point.cached_tasks.toLocaleString()}</td>
+                        <td className="text-right py-2 px-4">{point.total_tokens.toLocaleString()}</td>
+                        <td className="text-right py-2 px-4">{point.prompt_tokens.toLocaleString()}</td>
+                        <td className="text-right py-2 px-4">{point.completion_tokens.toLocaleString()}</td>
+                        <td className="text-right py-2 px-4">{`${(point.avg_duration_ms / 1000).toFixed(2)}s`}</td>
                         <td className="text-right py-2 px-4">{point.tokens_per_second.toFixed(2)}</td>
                       </tr>
                     ))}

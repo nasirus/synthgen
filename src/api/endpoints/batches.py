@@ -100,8 +100,10 @@ class StatsSummary(BaseModel):
     completed_tasks: int
     failed_tasks: int
     cached_tasks: int
+    processing_tasks: int
     total_tokens: int
-    completion_tokens: int
+    total_prompt_tokens: int
+    total_completion_tokens: int
     average_response_time: int
     tokens_per_second: float
     cache_hit_rate: float

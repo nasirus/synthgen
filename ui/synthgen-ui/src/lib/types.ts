@@ -1,18 +1,20 @@
 // Batch Types
 export interface Batch {
   batch_id: string;
-  created_at: string;
   batch_status: string;
   total_tasks: number;
   completed_tasks: number;
-  failed_tasks?: number;
-  pending_tasks?: number;
-  processing_tasks?: number;
-  total_tokens?: number;
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  average_processing_time?: number;
-  metadata?: Record<string, any>;
+  failed_tasks: number;
+  pending_tasks: number;
+  processing_tasks: number;
+  cached_tasks: number;
+  created_at: string;
+  started_at: string;
+  completed_at: string;
+  duration: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
 }
 
 export interface BatchListResponse {

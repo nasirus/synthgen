@@ -6,12 +6,19 @@ import { batchesService } from "@/services/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, Clock, Trash2 } from "lucide-react";
+import { AlertCircle, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Batch } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Batch, TaskStatus } from "@/lib/types";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -66,16 +73,8 @@ export default function BatchesPage() {
     router.push(`/batches/${batchId}/stats`);
   };
 
-  const getStatusBadge = (status: string, completedTasks: number, totalTasks: number) => {
-    const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-
-    if (status === "COMPLETED") {
-      return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Completed</Badge>;
-    } else if (status === "FAILED") {
-      return <Badge className="bg-red-500"><AlertCircle className="w-3 h-3 mr-1" /> Failed</Badge>;
-    } else {
-      return <Badge className="bg-blue-500"><Clock className="w-3 h-3 mr-1" /> In Progress ({Math.round(progress)}%)</Badge>;
-    }
+  const getStatusBadge = (status: TaskStatus) => {
+    return <StatusBadge status={status} />;
   };
 
   return (
@@ -141,7 +140,7 @@ export default function BatchesPage() {
                         {batch.completed_tasks} / {batch.total_tasks}
                       </TableCell>
                       <TableCell onClick={() => navigateToBatchDetail(batch.batch_id)}>
-                        {getStatusBadge(batch.batch_status, batch.completed_tasks, batch.total_tasks)}
+                        {getStatusBadge(batch.batch_status as TaskStatus)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

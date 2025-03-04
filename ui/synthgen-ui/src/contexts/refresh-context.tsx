@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
 
 // Available refresh intervals in milliseconds
 export const REFRESH_INTERVALS = {
@@ -21,15 +21,17 @@ interface RefreshContextType {
   setRefreshInterval: (interval: RefreshIntervalKey) => void;
   refreshNow: () => void;
   isRefreshing: boolean;
+  autoRefreshTriggered: boolean;
 }
 
 const defaultContext: RefreshContextType = {
   autoRefresh: true,
   setAutoRefresh: () => { },
-  refreshInterval: "10s",
+  refreshInterval: "5s",
   setRefreshInterval: () => { },
   refreshNow: () => { },
   isRefreshing: false,
+  autoRefreshTriggered: false,
 };
 
 const RefreshContext = createContext<RefreshContextType>(defaultContext);
@@ -55,13 +57,15 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
   const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalKey>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("refreshInterval") as RefreshIntervalKey;
-      return saved && REFRESH_INTERVALS[saved] !== undefined ? saved : "10s";
+      return saved && REFRESH_INTERVALS[saved] !== undefined ? saved : "5s";
     }
-    return "10s";
+    return "5s";
   });
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [autoRefreshTriggered, setAutoRefreshTriggered] = useState(false);
   const [refreshCount, setRefreshCount] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Store settings in localStorage when changed
   useEffect(() => {
@@ -75,6 +79,30 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
       localStorage.setItem("refreshInterval", refreshInterval);
     }
   }, [refreshInterval]);
+
+  // Set up and clean up the auto-refresh interval
+  useEffect(() => {
+    if (autoRefresh && REFRESH_INTERVALS[refreshInterval] > 0) {
+      const timer = setInterval(() => {
+        setIsRefreshing(true);
+        setAutoRefreshTriggered(true);
+        setRefreshCount(prev => prev + 1);
+        
+        setTimeout(() => {
+          setIsRefreshing(false);
+        }, 1000);
+        
+        // Clear the auto-refresh triggered status after 3 seconds
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          setAutoRefreshTriggered(false);
+          timerRef.current = null;
+        }, 3000);
+      }, REFRESH_INTERVALS[refreshInterval]);
+      
+      return () => clearInterval(timer);
+    }
+  }, [autoRefresh, refreshInterval]);
 
   // Function to trigger manual refresh
   const refreshNow = () => {
@@ -96,6 +124,7 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
         setRefreshInterval,
         refreshNow,
         isRefreshing,
+        autoRefreshTriggered,
       }}
     >
       {children}

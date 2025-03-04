@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Clock } from "lucide-react";
+import { RefreshCw, Clock, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -29,13 +29,14 @@ export function RefreshControl() {
         setRefreshInterval,
         refreshNow,
         isRefreshing,
+        autoRefreshTriggered,
     } = useRefreshContext();
 
     return (
         <div className="flex items-center gap-2">
-            {isRefreshing && (
-                <Badge variant="outline" className="bg-blue-500/10">
-                    Updating...
+            {!isRefreshing && autoRefreshTriggered && (
+                <Badge variant="outline" className="bg-green-500/10 flex items-center justify-center w-8 h-8 p-1">
+                    <Loader2 className="h-4 w-4 animate-spin" />
                 </Badge>
             )}
 

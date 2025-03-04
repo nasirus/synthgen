@@ -28,8 +28,6 @@ export interface StatusBadgeProps extends React.HTMLAttributes<HTMLSpanElement> 
 export function StatusBadge({ className, status, ...props }: StatusBadgeProps) {
     const mappedStatus = status.toLowerCase() as "completed" | "failed" | "processing" | "pending";
 
-    console.log("StatusBadge rendering with status:", status, "mapped to:", mappedStatus);
-
     const getIcon = () => {
         switch (mappedStatus) {
             case "completed":

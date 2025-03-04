@@ -330,7 +330,7 @@ async def list_batches(
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
-@router.get("/batches/{batch_id}/tasks")
+@router.get("/batches/{batch_id}/tasks/export")
 async def get_batch_tasks(
     batch_id: str,
     task_status: TaskStatus = Query(TaskStatus.COMPLETED),
@@ -351,6 +351,35 @@ async def get_batch_tasks(
             yield json.dumps(chunk) + "\n"
 
     return StreamingResponse(task_streamer(), media_type="application/x-ndjson")
+
+@retry(
+    stop=stop_after_attempt(settings.RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    reraise=True,
+)
+@router.get("/batches/{batch_id}/tasks")
+async def get_batch_tasks_with_pagination(
+    batch_id: str,
+    task_status: TaskStatus = Query(TaskStatus.COMPLETED),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=10000),
+    es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
+    current_user: str = Depends(get_current_user),
+):
+    logger.info(f"Fetching tasks for batch {batch_id} with pagination")
+    try:
+        tasks = await es_client.get_batch_tasks_with_pagination(
+            batch_id=batch_id,
+            task_status=task_status,
+            page=page,
+            page_size=page_size,
+        )
+        return tasks
+    except Exception as e:
+        logger.error(f"Failed to fetch tasks for batch {batch_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch tasks: {str(e)}"
+        )
 
 
 @retry(

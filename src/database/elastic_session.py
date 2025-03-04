@@ -187,9 +187,7 @@ class ElasticsearchClient:
             )
         return tasks
 
-    async def get_batch_tasks(
-        self, batch_id: str, task_status: TaskStatus = TaskStatus.COMPLETED
-    ):
+    async def get_batch_tasks(self, batch_id: str, task_status: TaskStatus):
         """
         Stream tasks for a specific batch using the scroll API.
         Yields each chunk (a dict containing a list of tasks and total count) as soon as it is received.
@@ -199,7 +197,11 @@ class ElasticsearchClient:
                 "bool": {
                     "must": [
                         {"term": {"batch_id": batch_id}},
-                        {"term": {"status": task_status.value}},
+                        (
+                            {"term": {"status": task_status.value}}
+                            if task_status
+                            else None
+                        ),
                     ]
                 }
             },
@@ -237,6 +239,51 @@ class ElasticsearchClient:
                 await self.client.clear_scroll(scroll_id=scroll_id)
             except Exception as e:
                 logger.warning(f"Failed to clear scroll context: {e}")
+
+    async def get_batch_tasks_with_pagination(
+        self,
+        batch_id: str,
+        task_status: TaskStatus,
+        page: int = 1,
+        page_size: int = 100,
+    ):
+        """
+        Export tasks for a specific batch. if task_status is not provided, all tasks are exported.
+        """
+
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"batch_id": batch_id}},
+                        # Only add status filter if task_status is provided
+                        (
+                            {"term": {"status": task_status.value}}
+                            if task_status
+                            else None
+                        ),
+                    ]
+                }
+            },
+            "sort": [{"completed_at": "desc"}],
+            "size": 10000,  # Max size for elasticsearch
+        }
+
+        result = await self.client.search(
+            index="events",
+            body=query,
+        )
+
+        total_documents = result["hits"]["total"]["value"]
+
+        tasks_chunk = self._process_hits(result["hits"]["hits"])
+        tasks_chunk = tasks_chunk[page_size * (page - 1) : page_size * page]
+        return {
+            "total": total_documents,
+            "page": page,
+            "page_size": page_size,
+            "tasks": tasks_chunk,
+        }
 
     def _process_batch_stats(
         self, result: Dict[str, Any], batch_id: str
@@ -360,7 +407,8 @@ class ElasticsearchClient:
                     "completed_at": completed_at,
                     "duration": duration,
                     "total_tasks": total_count,
-                    "completed_tasks": completed_count - bucket["cached_count"]["doc_count"],
+                    "completed_tasks": completed_count
+                    - bucket["cached_count"]["doc_count"],
                     "failed_tasks": failed_count,
                     "pending_tasks": pending_count,
                     "processing_tasks": processing_count,
@@ -567,7 +615,8 @@ class ElasticsearchClient:
                     "total_tasks": result["hits"]["total"]["value"],
                     "completed_tasks": result["aggregations"]["total_completed"][
                         "doc_count"
-                    ] - result["aggregations"]["total_cached"]["doc_count"],
+                    ]
+                    - result["aggregations"]["total_cached"]["doc_count"],
                     "failed_tasks": result["aggregations"]["total_failed"]["doc_count"],
                     "cached_tasks": result["aggregations"]["total_cached"]["doc_count"],
                     "total_tokens": result["aggregations"]["total_tokens_used"]["value"]
@@ -619,6 +668,7 @@ class ElasticsearchClient:
         result = await self.client.search(index="events", body=query)
 
         return result["aggregations"]
+
 
 # Create a global instance
 es_client = ElasticsearchClient()

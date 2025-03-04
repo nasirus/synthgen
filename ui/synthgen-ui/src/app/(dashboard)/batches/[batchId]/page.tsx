@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ArrowLeft, CheckCircle, Clock, BarChart } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, Clock, BarChart, XCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -391,7 +391,10 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                           <TableHead>Completed At</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Duration</TableHead>
-                          <TableHead>Tokens</TableHead>
+                          <TableHead>Total Tokens</TableHead>
+                          <TableHead>Prompt Tokens</TableHead>
+                          <TableHead>Completion Tokens</TableHead>
+                          <TableHead>Is Cached</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -406,10 +409,19 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                             </TableCell>
                             <TableCell>{getStatusBadge(task.status as TaskStatus)}</TableCell>
                             <TableCell>
-                              {task.duration_ms ? `${(task.duration_ms / 1000).toFixed(2)}s` : 'N/A'}
+                              {task.duration ? `${(task.duration / 1000).toFixed(2)}s` : 'N/A'}
                             </TableCell>
                             <TableCell>
                               {task.completions?.usage?.total_tokens || 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {task.completions?.usage?.prompt_tokens || 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {task.completions?.usage?.completion_tokens || 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {task.cached ? <CheckCircle className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
                             </TableCell>
                           </TableRow>
                         ))}

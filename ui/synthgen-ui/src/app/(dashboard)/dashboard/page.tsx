@@ -62,11 +62,6 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Dashboard</h1>
-                <RefreshControl />
-            </div>
-
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* Combined Status Card */}
                 <Card className="col-span-full lg:col-span-3 p-0">

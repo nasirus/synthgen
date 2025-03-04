@@ -94,7 +94,6 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Batches
           </Button>
-          <h1 className="text-3xl font-bold">Batch Details</h1>
         </div>
         <RefreshControl />
       </div>

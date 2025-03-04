@@ -74,10 +74,6 @@ export default function BatchesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Batches</h1>
-        <RefreshControl />
-      </div>
       {error && (
         <Card className="mb-6 border-red-500">
           <CardContent className="pt-6">
@@ -93,6 +89,7 @@ export default function BatchesPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">All Batches</h2>
+            <RefreshControl />
           </div>
         </CardHeader>
         <CardContent>

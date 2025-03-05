@@ -3,24 +3,20 @@
 import { useEffect, useState } from "react";
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, subHours, subMonths, subWeeks } from "date-fns";
 import { UsageStatsResponse, TimeSeriesDataPoint } from "@/lib/types";
-import { 
-  Bar, 
-  BarChart, 
-  Line, 
-  CartesianGrid, 
-  XAxis, 
-  YAxis, 
-  Area,
-  ComposedChart,
-  LabelList
-} from "recharts";
 import {
   ChartConfig,
   ChartContainer,
@@ -34,9 +30,18 @@ import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context
 import { useBatchStats } from "@/lib/hooks";
 import { Badge } from "@/components/ui/badge";
 
-// Import a charting library like Chart.js or Recharts
-// For this example, we'll use a placeholder for the charts
-// In a real implementation, you would use a library like Recharts
+// Import recharts components inside the component
+import { 
+  Area,
+  Bar, 
+  BarChart, 
+  CartesianGrid,
+  ComposedChart,
+  LabelList,
+  Line,
+  XAxis, 
+  YAxis
+} from "recharts";
 
 export default function BatchStatsPage({ params }: { params: { batchId: string } }) {
   // Unwrap params using React.use()
@@ -77,6 +82,18 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
       label: "Prompt",
       color: "hsl(95, 38%, 60%)",  // green-like color
     }
+  } satisfies ChartConfig;
+
+  // Define chart config for Performance Metrics chart
+  const performanceChartConfig = {
+    avg_duration_seconds: {
+      label: "Response Time (seconds)",
+      color: "hsl(25, 95%, 53%)",  // Orange color
+    },
+    tokens_per_second: {
+      label: "Tokens Per Second",
+      color: "hsl(216, 98%, 52%)",  // Blue color
+    },
   } satisfies ChartConfig;
 
   // Use SWR hooks for data fetching with auto-refresh
@@ -483,16 +500,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             <CardContent>
               {stats.time_series.length > 0 ? (
                 <ChartContainer 
-                  config={{
-                    avg_duration_seconds: {
-                      label: "Response Time (seconds)",
-                      color: "hsl(25, 95%, 53%)",  // Orange color
-                    },
-                    tokens_per_second: {
-                      label: "Tokens Per Second",
-                      color: "hsl(216, 98%, 52%)",  // Blue color
-                    },
-                  }}
+                  config={performanceChartConfig}
                   className="aspect-auto h-[300px] w-full"
                 >
                   <ComposedChart
@@ -545,6 +553,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                         />
                       } 
                     />
+                    <ChartLegend content={<ChartLegendContent />} />
                     <defs>
                       <linearGradient id="fillResponseTime" x1="0" y1="0" x2="0" y2="1">
                         <stop
@@ -576,7 +585,6 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                       dot={{ r: 3 }}
                       activeDot={{ r: 5 }}
                     />
-                    <ChartLegend content={<ChartLegendContent />} />
                   </ComposedChart>
                 </ChartContainer>
               ) : (

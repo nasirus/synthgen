@@ -59,7 +59,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
   // Generate pie chart data from batch task statistics
   const getTaskChartData = () => {
     if (!batch) return [];
-    
+
     return [
       { status: "completed", count: batch.completed_tasks, fill: "hsl(var(--chart-1))" },
       { status: "failed", count: batch.failed_tasks || 0, fill: "hsl(var(--chart-2))" },
@@ -93,6 +93,31 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
     cached: {
       label: "Cached",
       color: "hsl(271, 91%, 65%)", // Purple
+    },
+  };
+
+  // Generate pie chart data for token usage
+  const getTokenChartData = () => {
+    if (!batch || !batch.total_tokens) return [];
+
+    return [
+      { type: "prompt", count: batch.prompt_tokens || 0, fill: "hsl(var(--chart-1))" },
+      { type: "completion", count: batch.completion_tokens || 0, fill: "hsl(var(--chart-2))" },
+    ].filter(item => item.count > 0);
+  };
+
+  // Chart configuration for the token usage pie chart
+  const tokenChartConfig: ChartConfig = {
+    count: {
+      label: "Tokens",
+    },
+    prompt: {
+      label: "Prompt",
+      color: "hsl(216, 100%, 50%)", // Blue
+    },
+    completion: {
+      label: "Completion",
+      color: "hsl(262, 100%, 50%)", // Indigo
     },
   };
 
@@ -138,24 +163,15 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-base font-semibold">Task Statistics</div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(batch.batch_status as TaskStatus)}
-                  </div>
                 </div>
-
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-sm font-bold">{Math.round(calculateProgress())}%</span>
-                  <Progress value={calculateProgress()} className="h-2 flex-1" />
-                </div>
-
-                <ChartContainer 
+                <ChartContainer
                   config={taskChartConfig}
                   className="mx-auto aspect-square max-h-[200px] [&_.recharts-text]:fill-foreground"
                 >
                   <PieChart>
                     <ChartTooltip
                       content={
-                        <ChartTooltipContent 
+                        <ChartTooltipContent
                           nameKey="status"
                           formatter={(value, name, entry) => (
                             <div className="flex items-center justify-between w-full">
@@ -166,10 +182,10 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                         />
                       }
                     />
-                    <Pie 
-                      data={getTaskChartData()} 
-                      dataKey="count" 
-                      nameKey="status" 
+                    <Pie
+                      data={getTaskChartData()}
+                      dataKey="count"
+                      nameKey="status"
                       innerRadius={50}
                       outerRadius={80}
                       paddingAngle={2}
@@ -212,7 +228,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                     </Pie>
                   </PieChart>
                 </ChartContainer>
-                
+
                 <div className="flex flex-wrap gap-4 mt-4">
                   {getTaskChartData().map((entry, index) => (
                     <div key={index} className="flex items-center gap-2">
@@ -230,31 +246,86 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
             {/* Token Usage Card */}
             <Card className="shadow-sm h-full bg-background/30 border-border/50">
               <CardContent className="p-4">
-                <div className="text-base font-semibold mb-3">Token Usage</div>
-
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Total Tokens</span>
-                  <span className="text-xl font-bold">{batch.total_tokens?.toLocaleString() || '0'}</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-base font-semibold">Token Usage</div>
                 </div>
 
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Prompt Tokens</span>
-                  <div className="flex items-center">
-                    <span className="text-xl font-bold text-blue-500">{batch.prompt_tokens?.toLocaleString() || 0}</span>
-                    <span className="text-xs text-muted-foreground ml-1">
-                      ({batch.total_tokens ? `${Math.round((batch.prompt_tokens || 0) / batch.total_tokens * 100)}%` : '0%'})
-                    </span>
-                  </div>
-                </div>
+                <ChartContainer
+                  config={tokenChartConfig}
+                  className="mx-auto aspect-square max-h-[200px] [&_.recharts-text]:fill-foreground"
+                >
+                  <PieChart>
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          nameKey="type"
+                          formatter={(value, name, entry) => (
+                            <div className="flex items-center justify-between w-full">
+                              <span className="capitalize">{name}</span>
+                              <span className="ml-2 font-medium">{value.toLocaleString()}</span>
+                            </div>
+                          )}
+                        />
+                      }
+                    />
+                    <Pie
+                      data={getTokenChartData()}
+                      dataKey="count"
+                      nameKey="type"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      strokeWidth={1}
+                      stroke="hsl(var(--background))"
+                    >
+                      {getTokenChartData().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                      <Label
+                        content={({ viewBox }) => {
+                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                            return (
+                              <text
+                                x={viewBox.cx}
+                                y={viewBox.cy}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                              >
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={viewBox.cy}
+                                  className="fill-foreground text-3xl font-bold"
+                                >
+                                  {(batch.total_tokens || 0).toLocaleString()}
+                                </tspan>
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) + 24}
+                                  className="fill-muted-foreground text-xs"
+                                >
+                                  Tokens
+                                </tspan>
+                              </text>
+                            )
+                          }
+                          return null;
+                        }}
+                      />
+                    </Pie>
+                  </PieChart>
+                </ChartContainer>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Completion Tokens</span>
-                  <div className="flex items-center">
-                    <span className="text-xl font-bold text-indigo-500">{batch.completion_tokens?.toLocaleString() || 0}</span>
-                    <span className="text-xs text-muted-foreground ml-1">
-                      ({batch.total_tokens ? `${Math.round((batch.completion_tokens || 0) / batch.total_tokens * 100)}%` : '0%'})
-                    </span>
-                  </div>
+                <div className="flex flex-wrap gap-4 mt-4">
+                  {getTokenChartData().map((entry, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.fill }} />
+                      <span className="text-xs capitalize">{entry.type}</span>
+                      <span className="text-xs font-medium ml-1">{entry.count.toLocaleString()}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({batch.total_tokens ? `${Math.round(entry.count / batch.total_tokens * 100)}%` : '0%'})
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -264,7 +335,17 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
             {/* Timeline Card */}
             <Card className="shadow-sm h-full bg-background/30 border-border/50">
               <CardContent className="p-4">
-                <div className="text-base font-semibold mb-3">Timeline</div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-base font-semibold">Timeline</div>
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(batch.batch_status as TaskStatus)}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-sm font-bold">{Math.round(calculateProgress())}%</span>
+                  <Progress value={calculateProgress()} className="h-2 flex-1" />
+                </div>
 
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm font-medium">Duration</span>

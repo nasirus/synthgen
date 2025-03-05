@@ -16,9 +16,9 @@ import { useBatchTasks } from "@/lib/hooks";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
 
-export default function BatchTasksPage({ params }: { params: { batchId: string } }) {
+export default function BatchTasksPage({ params }: { params: Promise<{ batchId: string }> }) {
   // Unwrap params using React.use()
-  const unwrappedParams = React.use(params as unknown as Promise<{ batchId: string }>);
+  const unwrappedParams = React.use(params);
   const batchId = unwrappedParams.batchId;
 
   // Use the TaskStatus type for better type safety

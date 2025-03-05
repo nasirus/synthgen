@@ -42,9 +42,9 @@ import {
   YAxis
 } from "recharts";
 
-export default function BatchStatsPage({ params }: { params: { batchId: string } }) {
+export default function BatchStatsPage({ params }: { params: Promise<{ batchId: string }> }) {
   // Unwrap params using React.use()
-  const unwrappedParams = React.use(params as unknown as Promise<{ batchId: string }>);
+  const unwrappedParams = React.use(params);
   const batchId = unwrappedParams.batchId;
 
   const [timeRange, setTimeRange] = useState("24h");

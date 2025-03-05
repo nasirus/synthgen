@@ -15,9 +15,9 @@ import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context
 import { Pie, PieChart, Cell, Label } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
-export default function BatchDetailPage({ params }: { params: { batchId: string } }) {
+export default function BatchDetailPage({ params }: { params: Promise<{ batchId: string }> }) {
   // Unwrap params using React.use()
-  const unwrappedParams = React.use(params as unknown as Promise<{ batchId: string }>);
+  const unwrappedParams = React.use(params);
   const batchId = unwrappedParams.batchId;
 
   const router = useRouter();

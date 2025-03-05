@@ -3,17 +3,17 @@
 import { useEffect, useState } from "react";
 import React from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, BarChart as BarChartIcon, ClipboardList, TrendingUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, subHours, subMonths, subWeeks } from "date-fns";
 import { UsageStatsResponse, TimeSeriesDataPoint } from "@/lib/types";
@@ -31,15 +31,15 @@ import { useBatchStats } from "@/lib/hooks";
 import { Badge } from "@/components/ui/badge";
 
 // Import recharts components inside the component
-import { 
+import {
   Area,
-  Bar, 
-  BarChart, 
+  Bar,
+  BarChart,
   CartesianGrid,
   ComposedChart,
   LabelList,
   Line,
-  XAxis, 
+  XAxis,
   YAxis
 } from "recharts";
 
@@ -48,10 +48,10 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
   const unwrappedParams = React.use(params as unknown as Promise<{ batchId: string }>);
   const batchId = unwrappedParams.batchId;
 
-  const [timeRange, setTimeRange] = useState("1h");
+  const [timeRange, setTimeRange] = useState("24h");
   const [interval, setInterval] = useState("1m");
   const router = useRouter();
-  
+
   // Setup refresh context
   useRefreshContext();
   const { refreshInterval } = useRefreshTrigger();
@@ -126,6 +126,14 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
     router.push(`/batches/${batchId}`);
   };
 
+  const navigateToOverview = () => {
+    router.push(`/batches/${batchId}`);
+  };
+
+  const navigateToTasks = () => {
+    router.push(`/batches/${batchId}/tasks`);
+  };
+
   const timeRangeOptions = [
     { value: "1h", label: "Last Hour" },
     { value: "6h", label: "Last 6 Hours" },
@@ -170,24 +178,70 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Button variant="ghost" onClick={navigateBack} className="mr-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Batch Details
+    <div className="container p-0 mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={navigateBack} className="mr-2 p-2">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="ml-1">Back</span>
           </Button>
-          <h1 className="text-3xl font-bold">Batch Statistics</h1>
+          <div className="hidden sm:flex items-center ml-4 space-x-4">
+            <div className="flex items-center">
+              <p className="text-sm font-medium mr-2">Range:</p>
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className="w-[130px] h-8">
+                  <SelectValue placeholder="Select time range" />
+                </SelectTrigger>
+                <SelectContent>
+                  {timeRangeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center">
+              <p className="text-sm font-medium mr-2">Interval:</p>
+              <Select value={interval} onValueChange={setInterval}>
+                <SelectTrigger className="w-[130px] h-8">
+                  <SelectValue placeholder="Select interval" />
+                </SelectTrigger>
+                <SelectContent>
+                  {intervalOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {formatTimeRange(timeRange)}
+            </div>
+          </div>
         </div>
-        <RefreshControl />
+        <div className="flex items-center gap-2">
+          <Button onClick={navigateToOverview} size="sm" variant="outline" className="h-8">
+            <TrendingUp className="h-4 w-4 mr-1" /> Overview
+          </Button>
+          <Button onClick={() => { }} size="sm" variant="default" className="h-8">
+            <BarChartIcon className="h-4 w-4 mr-1" /> Statistics
+          </Button>
+          <Button onClick={navigateToTasks} size="sm" variant="outline" className="h-8">
+            <ClipboardList className="h-4 w-4 mr-1" /> Tasks
+          </Button>
+          <RefreshControl />
+        </div>
       </div>
 
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center space-x-4">
+      {/* Mobile view for time controls - only visible on small screens */}
+      <div className="sm:hidden flex flex-col space-y-4 mb-6">
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm font-medium mb-1">Time Range</p>
             <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger>
                 <SelectValue placeholder="Select time range" />
               </SelectTrigger>
               <SelectContent>
@@ -202,7 +256,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
           <div>
             <p className="text-sm font-medium mb-1">Interval</p>
             <Select value={interval} onValueChange={setInterval}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger>
                 <SelectValue placeholder="Select interval" />
               </SelectTrigger>
               <SelectContent>
@@ -215,16 +269,8 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             </Select>
           </div>
         </div>
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {stats ? formatTimeRange(timeRange) : "Loading..."}
-          </p>
-          {/* Updating indicator */}
-          {statsValidating && (
-            <Badge variant="outline" className="ml-2 text-xs bg-blue-500/10">
-              Updating stats...
-            </Badge>
-          )}
+        <div className="text-sm text-muted-foreground">
+          {formatTimeRange(timeRange)}
         </div>
       </div>
 
@@ -322,13 +368,13 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             <CardContent>
               {stats.time_series.length > 0 ? (
                 <ChartContainer config={taskChartConfig} className="aspect-auto h-[250px] w-full">
-                  <BarChart 
-                    accessibilityLayer 
+                  <BarChart
+                    accessibilityLayer
                     data={stats.time_series.map(point => ({
                       ...point,
                       total_tasks_display: point.completed_tasks + point.failed_tasks + point.cached_tasks,
-                      timestamp: new Date(point.timestamp).toLocaleTimeString([], { 
-                        hour: '2-digit', 
+                      timestamp: new Date(point.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
                         minute: '2-digit',
                         hour12: false
                       })
@@ -344,35 +390,35 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                     />
                     <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                     <ChartLegend content={<ChartLegendContent />} />
-                    <Bar 
-                      dataKey="completed_tasks" 
+                    <Bar
+                      dataKey="completed_tasks"
                       stackId="a"
-                      fill="var(--color-completed_tasks)" 
-                      radius={[0, 0, 4, 4]} 
+                      fill="var(--color-completed_tasks)"
+                      radius={[0, 0, 4, 4]}
                     />
-                    <Bar 
-                      dataKey="failed_tasks" 
+                    <Bar
+                      dataKey="failed_tasks"
                       stackId="a"
-                      fill="var(--color-failed_tasks)" 
-                      radius={[0, 0, 0, 0]} 
+                      fill="var(--color-failed_tasks)"
+                      radius={[0, 0, 0, 0]}
                     />
-                    <Bar 
-                      dataKey="cached_tasks" 
+                    <Bar
+                      dataKey="cached_tasks"
                       stackId="a"
-                      fill="var(--color-cached_tasks)" 
-                      radius={[4, 4, 0, 0]} 
+                      fill="var(--color-cached_tasks)"
+                      radius={[4, 4, 0, 0]}
                     >
-                      <LabelList 
-                        dataKey="total_tasks_display" 
-                        position="top" 
+                      <LabelList
+                        dataKey="total_tasks_display"
+                        position="top"
                         formatter={(value: number) => {
-                          if (value >= 1000000) return `${(value/1000000).toFixed(1)}M`;
-                          if (value >= 1000) return `${(value/1000).toFixed(1)}k`;
+                          if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                          if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
                           return value;
                         }}
-                        style={{ 
-                          fill: 'var(--foreground)', 
-                          fontSize: '10px', 
+                        style={{
+                          fill: 'var(--foreground)',
+                          fontSize: '10px',
                           fontWeight: 'bold',
                           textShadow: '0px 0px 2px rgba(0,0,0,0.5)'
                         }}
@@ -414,13 +460,13 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             <CardContent>
               {stats.time_series.length > 0 ? (
                 <ChartContainer config={tokenChartConfig} className="aspect-auto h-[250px] w-full">
-                  <BarChart 
-                    accessibilityLayer 
+                  <BarChart
+                    accessibilityLayer
                     data={stats.time_series.map(point => ({
                       ...point,
                       total_tokens_display: point.prompt_tokens + point.completion_tokens,
-                      timestamp: new Date(point.timestamp).toLocaleTimeString([], { 
-                        hour: '2-digit', 
+                      timestamp: new Date(point.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
                         minute: '2-digit',
                         hour12: false
                       })
@@ -436,29 +482,29 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                     />
                     <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                     <ChartLegend content={<ChartLegendContent />} />
-                    <Bar 
-                      dataKey="prompt_tokens" 
+                    <Bar
+                      dataKey="prompt_tokens"
                       stackId="a"
-                      fill="var(--color-prompt_tokens)" 
-                      radius={[4, 4, 0, 0]} 
+                      fill="var(--color-prompt_tokens)"
+                      radius={[4, 4, 0, 0]}
                     />
-                    <Bar 
-                      dataKey="completion_tokens" 
+                    <Bar
+                      dataKey="completion_tokens"
                       stackId="a"
-                      fill="var(--color-completion_tokens)" 
-                      radius={[0, 0, 4, 4]} 
+                      fill="var(--color-completion_tokens)"
+                      radius={[0, 0, 4, 4]}
                     >
-                      <LabelList 
-                        dataKey="total_tokens_display" 
-                        position="top" 
+                      <LabelList
+                        dataKey="total_tokens_display"
+                        position="top"
                         formatter={(value: number) => {
-                          if (value >= 1000000) return `${(value/1000000).toFixed(1)}M`;
-                          if (value >= 1000) return `${(value/1000).toFixed(1)}k`;
+                          if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                          if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
                           return value;
                         }}
-                        style={{ 
-                          fill: 'var(--foreground)', 
-                          fontSize: '10px', 
+                        style={{
+                          fill: 'var(--foreground)',
+                          fontSize: '10px',
                           fontWeight: 'bold',
                           textShadow: '0px 0px 2px rgba(0,0,0,0.5)'
                         }}
@@ -499,7 +545,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             </CardHeader>
             <CardContent>
               {stats.time_series.length > 0 ? (
-                <ChartContainer 
+                <ChartContainer
                   config={performanceChartConfig}
                   className="aspect-auto h-[300px] w-full"
                 >
@@ -508,8 +554,8 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                     data={stats.time_series.map(point => ({
                       ...point,
                       avg_duration_seconds: point.avg_duration_ms / 1000,
-                      timestamp: new Date(point.timestamp).toLocaleTimeString([], { 
-                        hour: '2-digit', 
+                      timestamp: new Date(point.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
                         minute: '2-digit',
                         hour12: false
                       })
@@ -528,7 +574,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                       axisLine={false}
                       tickMargin={8}
                     />
-                    <YAxis 
+                    <YAxis
                       yAxisId="left"
                       tickLine={false}
                       axisLine={false}
@@ -536,7 +582,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                       tickFormatter={(value) => `${value.toFixed(1)}s`}
                       domain={['dataMin - 0.1', 'dataMax + 0.1']}
                     />
-                    <YAxis 
+                    <YAxis
                       yAxisId="right"
                       orientation="right"
                       tickLine={false}
@@ -544,14 +590,14 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                       tickMargin={8}
                       domain={['dataMin - 10', 'dataMax + 10']}
                     />
-                    <ChartTooltip 
-                      cursor={false} 
+                    <ChartTooltip
+                      cursor={false}
                       content={
-                        <ChartTooltipContent 
+                        <ChartTooltipContent
                           indicator="line"
                           labelFormatter={(label: string) => `Time: ${label}`}
                         />
-                      } 
+                      }
                     />
                     <ChartLegend content={<ChartLegendContent />} />
                     <defs>
@@ -601,11 +647,11 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
               <div className="flex w-full items-start gap-2 text-sm">
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2 font-medium leading-none">
-                    Avg. Response Time: {stats?.summary?.average_response_time 
-                      ? (stats.summary.average_response_time / 1000).toFixed(2) 
-                      : '0.00'}s • 
-                    Avg. Tokens/Sec: {stats?.summary?.tokens_per_second 
-                      ? stats.summary.tokens_per_second.toFixed(2) 
+                    Avg. Response Time: {stats?.summary?.average_response_time
+                      ? (stats.summary.average_response_time / 1000).toFixed(2)
+                      : '0.00'}s •
+                    Avg. Tokens/Sec: {stats?.summary?.tokens_per_second
+                      ? stats.summary.tokens_per_second.toFixed(2)
                       : '0.00'}
                   </div>
                   <div className="leading-none text-muted-foreground">

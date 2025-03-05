@@ -41,6 +41,10 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
     router.push(`/batches/${batchId}/stats`);
   };
 
+  const navigateToOverview = () => {
+    router.push(`/batches/${batchId}`);
+  };
+
   const navigateBack = () => {
     router.push("/batches");
   };
@@ -126,17 +130,20 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
       {/* Header with navigation */}
       <div className="flex items-center justify-between border-b pb-2 mb-3">
         <div className="flex items-center">
-          <Button variant="ghost" onClick={navigateBack} size="sm" className="px-2">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          <Button variant="ghost" onClick={navigateBack} className="mr-2 p-2">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="ml-1">Back</span>
           </Button>
-          <h1 className="text-xl font-bold">Batch Details</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={navigateToTasks} size="sm" variant="outline" className="h-8">
-            <ClipboardList className="h-4 w-4 mr-1" /> Tasks
+          <Button onClick={navigateToOverview} size="sm" variant="default" className="h-8">
+            <TrendingUp className="h-4 w-4 mr-1" /> Overview
           </Button>
           <Button onClick={navigateToStats} size="sm" variant="outline" className="h-8">
             <BarChart className="h-4 w-4 mr-1" /> Statistics
+          </Button>
+          <Button onClick={navigateToTasks} size="sm" variant="outline" className="h-8">
+            <ClipboardList className="h-4 w-4 mr-1" /> Tasks
           </Button>
           <RefreshControl />
         </div>

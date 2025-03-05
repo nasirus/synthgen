@@ -7,12 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ArrowLeft, CheckCircle, Clock, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, BarChart, CheckCircle, Clock, ClipboardList, TrendingUp, XCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { useBatch, useBatchTasks } from "@/lib/hooks";
+import { useBatchTasks } from "@/lib/hooks";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
 
@@ -27,13 +27,6 @@ export default function BatchTasksPage({ params }: { params: { batchId: string }
   useRefreshContext();
   // Get refresh interval from context to use in our SWR config
   const { refreshInterval } = useRefreshTrigger();
-
-  // Use SWR hooks for data fetching with auto-refresh
-  const {
-    data: batch,
-    error: batchError,
-    isLoading: batchLoading
-  } = useBatch(batchId);
 
   const {
     data: tasksData,
@@ -67,6 +60,14 @@ export default function BatchTasksPage({ params }: { params: { batchId: string }
     router.push(`/batches/${batchId}`);
   };
 
+  const navigateToOverview = () => {
+    router.push(`/batches/${batchId}`);
+  };
+
+  const navigateToStats = () => {
+    router.push(`/batches/${batchId}/stats`);
+  };
+
   const getStatusBadge = (status: TaskStatus) => {
     return <StatusBadge status={status} />;
   };
@@ -77,16 +78,21 @@ export default function BatchTasksPage({ params }: { params: { batchId: string }
         <div className="flex items-center">
           <Button variant="ghost" onClick={navigateBack} className="mr-2 p-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="ml-1">Back to Batch Details</span>
+            <span className="ml-1">Back</span>
           </Button>
-          <h1 className="text-xl font-bold">Batch Tasks</h1>
-          {batch && (
-            <Badge variant="outline" className="ml-2">
-              Batch ID: {batchId}
-            </Badge>
-          )}
         </div>
-        <RefreshControl />
+        <div className="flex items-center gap-2">
+          <Button onClick={navigateToOverview} size="sm" variant="outline" className="h-8">
+            <TrendingUp className="h-4 w-4 mr-1" /> Overview
+          </Button>
+          <Button onClick={navigateToStats} size="sm" variant="outline" className="h-8">
+            <BarChart className="h-4 w-4 mr-1" /> Statistics
+          </Button>          
+          <Button onClick={() => {}} size="sm" variant="default" className="h-8">
+            <ClipboardList className="h-4 w-4 mr-1" /> Tasks
+          </Button>
+          <RefreshControl />
+        </div>
       </div>
 
       <Card>

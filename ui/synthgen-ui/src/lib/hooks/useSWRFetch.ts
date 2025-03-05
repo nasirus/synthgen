@@ -1,4 +1,4 @@
-import useSWR, { SWRConfiguration, useSWRConfig } from 'swr';
+import useSWR, { SWRConfiguration } from 'swr';
 import { apiClient } from '@/services/api';
 import { useRefreshTrigger } from '@/contexts/refresh-context';
 import { useEffect } from 'react';
@@ -22,7 +22,6 @@ const fetcher = async <T>(url: string): Promise<T> => {
 export function useSWRFetch<T>(url: string, config?: SWRConfiguration) {
   // Get refresh settings from context
   const { refreshInterval, manualRefreshCounter } = useRefreshTrigger();
-  const { cache, mutate } = useSWRConfig();
 
   // Default config with refresh interval from context
   const defaultConfig: SWRConfiguration = {

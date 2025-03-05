@@ -1,5 +1,6 @@
 import { useSWRFetch } from './useSWRFetch';
 import { SWRConfiguration } from 'swr';
+import { HealthCheckResponse } from '../types';
 
 /**
  * Hook to fetch API health status with auto-refresh
@@ -7,7 +8,7 @@ import { SWRConfiguration } from 'swr';
  * @returns The health check data and SWR state
  */
 export function useHealthCheck(config?: SWRConfiguration) {
-  return useSWRFetch<any>(
+  return useSWRFetch<HealthCheckResponse>(
     '/health',
     {
       // Health checks need more frequent updates

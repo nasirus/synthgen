@@ -80,6 +80,19 @@ export interface UsageStatsResponse {
   summary: StatsSummary;
 }
 
+// Health Check Types
+export interface HealthCheckResponse {
+  services: {
+    api: string;
+    rabbitmq: string;
+    elasticsearch: string;
+    task_queue_messages: number;
+    task_queue_consumers: number;
+    batch_queue_messages: number;
+    batch_queue_consumers: number;
+  }
+}
+
 // Task Types
 export interface TaskStats {
   total_tasks: number;
@@ -95,3 +108,17 @@ export interface TaskStats {
 
 // Define the task status type for better consistency
 export type TaskStatus = "COMPLETED" | "FAILED" | "PROCESSING" | "PENDING";
+
+export interface TaskStatsResponse {
+  total_tasks: number;
+  completed_tasks: number;
+  failed_tasks: number;
+  cached_tasks: number;
+  processing_tasks: number;
+  pending_tasks: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+

@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react";
 import React from "react";
 import { useRouter } from "next/navigation";
-import { batchesService } from "@/services/api";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ArrowLeft, BarChart3, Clock, Zap, TrendingUp } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, subHours, subMonths, subWeeks } from "date-fns";
 import { UsageStatsResponse, TimeSeriesDataPoint } from "@/lib/types";
@@ -15,15 +14,10 @@ import {
   Bar, 
   BarChart, 
   Line, 
-  LineChart, 
   CartesianGrid, 
   XAxis, 
   YAxis, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
   Area,
-  AreaChart,
   ComposedChart,
   LabelList
 } from "recharts";

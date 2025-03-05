@@ -73,9 +73,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
           <Button onClick={navigateToStats} size="sm" variant="outline" className="h-8">
             <BarChart className="h-4 w-4 mr-1" /> Statistics
           </Button>
-          <Button size="sm" variant="outline" className="h-8 px-2">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          <RefreshControl />
         </div>
       </div>
 
@@ -99,7 +97,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
             <Card className="shadow-sm h-full bg-background/30 border-border/50">
               <CardContent className="p-4">
                 <div className="flex justify-between items-center mb-2">
-                  <div className="text-base font-semibold">Status & Progress</div>
+                  <div className="text-base font-semibold">Status</div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground flex items-center">
                       <Clock className="h-3 w-3 mr-1" />
@@ -194,7 +192,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm font-medium">Prompt Tokens</span>
                   <div className="flex items-center">
-                    <span className="text-xl font-bold text-blue-500">{batch.prompt_tokens || 0}</span>
+                    <span className="text-xl font-bold text-blue-500">{batch.prompt_tokens?.toLocaleString() || 0}</span>
                     <span className="text-xs text-muted-foreground ml-1">
                       ({batch.total_tokens ? `${Math.round((batch.prompt_tokens || 0) / batch.total_tokens * 100)}%` : '0%'})
                     </span>
@@ -204,7 +202,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Completion Tokens</span>
                   <div className="flex items-center">
-                    <span className="text-xl font-bold text-indigo-500">{batch.completion_tokens || 0}</span>
+                    <span className="text-xl font-bold text-indigo-500">{batch.completion_tokens?.toLocaleString() || 0}</span>
                     <span className="text-xs text-muted-foreground ml-1">
                       ({batch.total_tokens ? `${Math.round((batch.completion_tokens || 0) / batch.total_tokens * 100)}%` : '0%'})
                     </span>

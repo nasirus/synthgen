@@ -332,52 +332,70 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
           </div>
 
           <div className="w-1/3">
-            {/* Timeline Card */}
+            {/* Batch Execution Timeline Card */}
             <Card className="shadow-sm h-full bg-background/30 border-border/50">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-base font-semibold">Timeline</div>
+              <CardContent className="pt-4 px-4 flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-base font-semibold">Batch Lifecycle</div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(batch.batch_status as TaskStatus)}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-sm font-bold">{Math.round(calculateProgress())}%</span>
-                  <Progress value={calculateProgress()} className="h-2 flex-1" />
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-muted-foreground">Completion</span>
+                    <span className="text-sm font-bold">{Math.round(calculateProgress())}%</span>
+                  </div>
+                  <Progress value={calculateProgress()} className="h-2 w-full" />
                 </div>
 
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Duration</span>
-                  <span className="text-sm flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    {batch.duration ? (() => {
-                      const totalSeconds = batch.duration;
-                      const hours = Math.floor(totalSeconds / 3600);
-                      const minutes = Math.floor((totalSeconds % 3600) / 60);
-                      const seconds = totalSeconds % 60;
-                      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                    })() : '00:00:00'}
-                  </span>
-                </div>
+                <div className="grid grid-cols-1 gap-2 mt-auto">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Created</span>
+                    <span className="text-sm font-medium">{new Date(batch.created_at).toLocaleString()}</span>
+                  </div>
 
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Created</span>
-                  <span className="text-sm">{new Date(batch.created_at).toLocaleString()}</span>
-                </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Started</span>
+                    <span className="text-sm font-medium">
+                      {batch.started_at ? new Date(batch.started_at).toLocaleString() : 'N/A'}
+                    </span>
+                  </div>
 
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Started</span>
-                  <span className="text-sm">
-                    {batch.started_at ? new Date(batch.started_at).toLocaleString() : 'N/A'}
-                  </span>
-                </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Completed</span>
+                    <span className="text-sm font-medium">
+                      {batch.completed_at ? new Date(batch.completed_at).toLocaleString() : 'N/A'}
+                    </span>
+                  </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Completed</span>
-                  <span className="text-sm">
-                    {batch.completed_at ? new Date(batch.completed_at).toLocaleString() : 'N/A'}
-                  </span>
+                  <div className="flex-1 flex items-center justify-center my-2">
+                    <div className="relative bg-black/20 rounded-lg overflow-hidden w-full">
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg"></div>
+                      <div className="relative p-3 flex items-center justify-center">
+                        <div className="mr-3 flex-shrink-0">
+                          <div className="p-2 rounded-full bg-primary/20 backdrop-blur-sm">
+                            <Clock className="h-5 w-5 text-primary" />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium text-center">
+                            Total Duration
+                          </div>
+                          <div className="font-mono font-bold text-lg text-center">
+                            {batch.duration ? (() => {
+                              const totalSeconds = batch.duration;
+                              const hours = Math.floor(totalSeconds / 3600);
+                              const minutes = Math.floor((totalSeconds % 3600) / 60);
+                              const seconds = totalSeconds % 60;
+                              return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                            })() : '00:00:00'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

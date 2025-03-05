@@ -33,24 +33,6 @@ export function MainNav({ className }: MainNavProps) {
       icon: <FaClipboardList className="mr-2 h-4 w-4" />,
       active: pathname === "/batches" || pathname?.startsWith("/batches/"),
     },
-    {
-      href: "/analytics",
-      label: "Analytics",
-      icon: <FaChartBar className="mr-2 h-4 w-4" />,
-      active: pathname === "/analytics",
-    },
-    {
-      href: "/tasks",
-      label: "Tasks",
-      icon: <FaTasks className="mr-2 h-4 w-4" />,
-      active: pathname === "/tasks" || pathname?.startsWith("/tasks/"),
-    },
-    {
-      href: "/reports",
-      label: "Reports",
-      icon: <FaChartLine className="mr-2 h-4 w-4" />,
-      active: pathname === "/reports",
-    },
   ];
 
   return (

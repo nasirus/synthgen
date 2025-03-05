@@ -5,7 +5,6 @@ import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckC
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHealthCheck, useBatches, useTaskStats } from "@/lib/hooks";
 import { Batch } from "@/lib/types";
-import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext } from "@/contexts/refresh-context";
 
 interface BatchStats {

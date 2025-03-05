@@ -26,8 +26,10 @@ export interface Task {
   message_id: string;
   batch_id: string;
   created_at: string;
+  started_at?: string;
+  completed_at?: string;
   status: string;
-  duration_ms?: number;
+  duration?: number;
   cached?: boolean;
   completions?: {
     usage?: {

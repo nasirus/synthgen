@@ -1,5 +1,5 @@
 import { useSWRFetch } from './useSWRFetch';
-import { Batch, BatchListResponse, TaskStatus } from '@/lib/types';
+import { Batch, BatchListResponse, BatchTasksResponse, TaskStatus, UsageStatsResponse } from '@/lib/types';
 import { SWRConfiguration } from 'swr';
 
 /**
@@ -35,7 +35,7 @@ export function useBatches(config?: SWRConfiguration) {
  * @returns The tasks data and SWR state
  */
 export function useBatchTasks(batchId: string, status: TaskStatus, config?: SWRConfiguration) {
-  return useSWRFetch<{ tasks: any[], total: number }>(
+  return useSWRFetch<BatchTasksResponse>(
     `/api/v1/batches/${batchId}/tasks?task_status=${status}`,
     config
   );
@@ -55,7 +55,7 @@ export function useBatchStats(
   interval: string, 
   config?: SWRConfiguration
 ) {
-  return useSWRFetch<any>(
+  return useSWRFetch<UsageStatsResponse>(
     `/api/v1/batches/${batchId}/stats?time_range=${timeRange}&interval=${interval}`,
     config
   );

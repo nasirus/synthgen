@@ -2,17 +2,17 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ArrowLeft, BarChart, Check, Clock, ClipboardList, TrendingUp, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, BarChart, Clock, ClipboardList, TrendingUp } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useBatch } from "@/lib/hooks";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
-import { LabelList, Pie, PieChart, Cell, Label } from "recharts";
+import { Pie, PieChart, Cell, Label } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 export default function BatchDetailPage({ params }: { params: { batchId: string } }) {
@@ -180,7 +180,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       content={
                         <ChartTooltipContent
                           nameKey="status"
-                          formatter={(value, name, entry) => (
+                          formatter={(value, name) => (
                             <div className="flex items-center justify-between w-full">
                               <span className="capitalize">{name}</span>
                               <span className="ml-2 font-medium">{value}</span>
@@ -266,7 +266,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                       content={
                         <ChartTooltipContent
                           nameKey="type"
-                          formatter={(value, name, entry) => (
+                          formatter={(value, name) => (
                             <div className="flex items-center justify-between w-full">
                               <span className="capitalize">{name}</span>
                               <span className="ml-2 font-medium">{value.toLocaleString()}</span>

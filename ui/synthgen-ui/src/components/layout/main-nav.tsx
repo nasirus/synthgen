@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { FaBrain, FaChartBar, FaChartLine, FaClipboardList, FaHome, FaTasks, FaBars } from "react-icons/fa";
+import { FaBrain, FaClipboardList, FaHome, FaBars } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

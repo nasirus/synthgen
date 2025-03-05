@@ -28,7 +28,6 @@ import {
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
 import { useBatchStats } from "@/lib/hooks";
-import { Badge } from "@/components/ui/badge";
 
 // Import recharts components inside the component
 import {
@@ -101,7 +100,6 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
     data: statsData,
     error: statsError,
     isLoading: statsLoading,
-    isValidating: statsValidating,
     mutate: refreshStats
   } = useBatchStats(batchId, timeRange, interval, {
     // Use the refresh interval from the global context
@@ -120,7 +118,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
   // Refresh stats when timeRange or interval changes
   useEffect(() => {
     refreshStats();
-  }, [timeRange, interval]);
+  }, [timeRange, interval, refreshStats]);
 
   const navigateBack = () => {
     router.push(`/batches/${batchId}`);

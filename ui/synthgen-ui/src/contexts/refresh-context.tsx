@@ -64,7 +64,6 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefreshTriggered, setAutoRefreshTriggered] = useState(false);
-  const [refreshCount, setRefreshCount] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Store settings in localStorage when changed
@@ -86,7 +85,6 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
       const timer = setInterval(() => {
         setIsRefreshing(true);
         setAutoRefreshTriggered(true);
-        setRefreshCount(prev => prev + 1);
         
         setTimeout(() => {
           setIsRefreshing(false);
@@ -115,15 +113,12 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
   // Function to trigger manual refresh
   const refreshNow = () => {
     setIsRefreshing(true);
-    setRefreshCount(prev => prev + 1);
+    setAutoRefreshTriggered(false);
     
-    // Trigger the manual refresh event
-    triggerManualRefreshEvent();
-
-    // Reset the refreshing indicator after a short delay
+    // Simulate or perform the actual refresh logic
     setTimeout(() => {
       setIsRefreshing(false);
-    }, 1000);
+    }, 500);
   };
 
   return (

@@ -50,7 +50,7 @@ export default function BatchTasksPage({ params }: { params: { batchId: string }
   // Refresh tasks when status changes
   useEffect(() => {
     refreshTasks();
-  }, [taskStatus]);
+  }, [taskStatus, refreshTasks]);
 
   const handleStatusChange = (status: TaskStatus) => {
     setTaskStatus(status);
@@ -163,7 +163,7 @@ export default function BatchTasksPage({ params }: { params: { batchId: string }
                 <TableHeader>
                   <TableRow>
                     <TableHead>Task ID</TableHead>
-                    <TableHead>Completed</TableHead>
+                    <TableHead>Completed At</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Total Tokens</TableHead>

@@ -47,11 +47,11 @@
   --foreground: oklch(0.147 0.004 49.25);
 }
 
-.container {
+/* .container {
   max-width: var(--site-width);
   padding-left: var(--content-padding);
   padding-right: var(--content-padding);
-}
+} */
 
 .dark {
   --background: oklch(0.147 0.004 49.25);

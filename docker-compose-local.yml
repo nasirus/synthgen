@@ -4,7 +4,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "1"
           memory: 1024M
     container_name: rabbitmq
     ports:
@@ -51,7 +51,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "1"
           memory: 1024M
     container_name: api
     ports:
@@ -85,8 +85,9 @@ services:
       replicas: ${NUM_CONSUMERS:-1}
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "1"
           memory: 1024M
+    container_name: consumer
     environment:
       - CONSUMER_ID=${CONSUMER_ID:-1}
     depends_on:
@@ -106,7 +107,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "1"
           memory: 1024M
     container_name: minio
     ports:
@@ -135,8 +136,9 @@ services:
       replicas: ${NUM_WORKERS:-1}
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "1"
           memory: 1024M
+    container_name: worker
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -181,7 +183,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "1"
           memory: 1024M
     ports:
       - "4000:4000"

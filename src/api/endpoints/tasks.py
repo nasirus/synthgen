@@ -82,7 +82,20 @@ async def get_task(
             raise HTTPException(
                 status_code=404, detail=f"Task with message_id {message_id} not found"
             )
-        return Task(**event)
+        return Task(
+            message_id=event["message_id"],
+            batch_id=event.get("batch_id"),
+            status=event["status"],
+            body=event.get("body"),
+            completions=event.get("completions"),
+            cached=event.get("cached", False),
+            created_at=event["created_at"],
+            started_at=event.get("started_at"),
+            completed_at=event.get("completed_at"),
+            duration=event.get("duration"),
+            dataset=event.get("dataset"),
+            source=event.get("source"),
+        )
     except HTTPException:
         raise
     except Exception as e:

@@ -24,6 +24,26 @@ services:
     environment:
       - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit consumer_timeout 3600000
 
+  ui:
+    build:
+      context: ./ui/synthgen-ui
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    container_name: synthgen-ui
+    ports:
+      - "${UI_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT:-8002}
+      - NEXT_PUBLIC_API_KEY=${API_KEY}
+    depends_on:
+      - api
+    networks:
+      - synthetic-data-network
+
   api:
     build:
       context: .

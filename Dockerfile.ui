@@ -3,14 +3,14 @@ FROM node:alpine3.21 AS base
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY ui/synthgen-ui/package.json ui/synthgen-ui/package-lock.json ./
 RUN npm ci --legacy-peer-deps
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY ui/synthgen-ui/ .
 
 # Next.js collects anonymous telemetry data about general usage
 # Learn more here: https://nextjs.org/telemetry

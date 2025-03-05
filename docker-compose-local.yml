@@ -4,17 +4,17 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 1024M
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # RabbitMQ default port
+      - "5672:5672" # RabbitMQ default port
       - "15672:15672" # RabbitMQ management interface port
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
       retries: 5
     env_file:
@@ -26,21 +26,21 @@ services:
 
   ui:
     build:
-      context: ./ui/synthgen-ui
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.ui
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "1"
           memory: 512M
-    container_name: synthgen-ui
+    container_name: ui
     ports:
       - "${UI_PORT:-3000}:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT:-8002}
-      - NEXT_PUBLIC_API_KEY=${API_KEY}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - synthetic-data-network
 
@@ -51,9 +51,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 1024M
-    container_name: synthetic-data-api
+    container_name: api
     ports:
       - "${API_PORT:-8002}:8000"
     depends_on:
@@ -63,6 +63,12 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
     volumes:
       - ./src:/app/src
     env_file:
@@ -79,7 +85,7 @@ services:
       replicas: ${NUM_CONSUMERS:-1}
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 1024M
     environment:
       - CONSUMER_ID=${CONSUMER_ID:-1}
@@ -100,12 +106,12 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 1024M
     container_name: minio
     ports:
-      - "9000:9000"   # API port
-      - "9001:9001"   # Console port
+      - "9000:9000" # API port
+      - "9001:9001" # Console port
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
@@ -114,9 +120,9 @@ services:
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      interval: 10s
+      timeout: 10s
+      retries: 5
     networks:
       - synthetic-data-network
 
@@ -129,7 +135,7 @@ services:
       replicas: ${NUM_WORKERS:-1}
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 1024M
     depends_on:
       rabbitmq:
@@ -151,7 +157,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
+          cpus: "1"
           memory: 1024M
     ports:
       - "9200:9200"
@@ -163,9 +169,9 @@ services:
       - elasticsearch_data:/usr/share/elasticsearch/data
     healthcheck:
       test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
+      retries: 5
     networks:
       - synthetic-data-network
 
@@ -175,7 +181,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 1024M
     ports:
       - "4000:4000"
@@ -185,7 +191,7 @@ services:
     networks:
       - synthetic-data-network
     env_file:
-      - .env  
+      - .env
 
 volumes:
   minio_data:
@@ -195,4 +201,4 @@ volumes:
 # Add networks configuration at the bottom of the file
 networks:
   synthetic-data-network:
-    driver: bridge 
+    driver: bridge

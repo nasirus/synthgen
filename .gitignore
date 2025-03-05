@@ -9,6 +9,9 @@ __pycache__/
 .cursorignore
 .cursorindexingignore
 
+# Docker
+.dockerignore
+
 # Environment Variables
 *.env
 .local.env

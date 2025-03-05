@@ -67,4 +67,16 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/synthgen-worker:${{ steps.meta.outputs.version }}
             ${{ secrets.DOCKER_USERNAME }}/synthgen-worker:latest
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/synthgen-worker:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/synthgen-worker:buildcache,mode=max 
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/synthgen-worker:buildcache,mode=max
+
+      - name: Build and push UI image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile.ui
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/synthgen-ui:${{ steps.meta.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/synthgen-ui:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/synthgen-ui:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/synthgen-ui:buildcache,mode=max

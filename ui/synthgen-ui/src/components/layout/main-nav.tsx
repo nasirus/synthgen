@@ -39,7 +39,6 @@ export function MainNav({ className }: MainNavProps) {
     <div className={cn("flex w-full items-center", className)}>
       {/* Logo - always visible */}
       <Link href="/dashboard" className="flex items-center space-x-2 shrink-0">
-        <FaBrain className="h-6 w-6" />
         <span className="font-bold text-xl">SynthGen</span>
       </Link>
 

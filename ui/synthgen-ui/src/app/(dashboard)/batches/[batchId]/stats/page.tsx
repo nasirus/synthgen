@@ -47,8 +47,8 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
   const [stats, setStats] = useState<UsageStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState("24h");
-  const [interval, setInterval] = useState("1h");
+  const [timeRange, setTimeRange] = useState("1h");
+  const [interval, setInterval] = useState("1m");
   const router = useRouter();
 
   // Define chart config for Tasks Over Time chart
@@ -101,15 +101,8 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
 
   const intervalOptions = [
     { value: "1m", label: "1 Minute" },
-    { value: "5m", label: "5 Minutes" },
-    { value: "15m", label: "15 Minutes" },
-    { value: "30m", label: "30 Minutes" },
     { value: "1h", label: "1 Hour" },
-    { value: "3h", label: "3 Hours" },
-    { value: "6h", label: "6 Hours" },
-    { value: "12h", label: "12 Hours" },
     { value: "1d", label: "1 Day" },
-    { value: "1w", label: "1 Week" },
   ];
 
   // Helper function to format the time range for display

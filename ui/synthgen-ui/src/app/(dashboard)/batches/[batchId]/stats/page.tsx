@@ -34,6 +34,10 @@ import {
   ChartLegend,
   ChartLegendContent
 } from "@/components/ui/chart";
+import { RefreshControl } from "@/components/ui/refresh-control";
+import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
+import { useBatchStats } from "@/lib/hooks";
+import { Badge } from "@/components/ui/badge";
 
 // Import a charting library like Chart.js or Recharts
 // For this example, we'll use a placeholder for the charts
@@ -44,12 +48,13 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
   const unwrappedParams = React.use(params as unknown as Promise<{ batchId: string }>);
   const batchId = unwrappedParams.batchId;
 
-  const [stats, setStats] = useState<UsageStatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState("1h");
   const [interval, setInterval] = useState("1m");
   const router = useRouter();
+  
+  // Setup refresh context
+  useRefreshContext();
+  const { refreshInterval } = useRefreshTrigger();
 
   // Define chart config for Tasks Over Time chart
   const taskChartConfig = {
@@ -67,23 +72,31 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
     }
   } satisfies ChartConfig;
 
-  const fetchStats = async () => {
-    try {
-      setLoading(true);
-      const response = await batchesService.getBatchStats(batchId, timeRange, interval);
-      setStats(response.data);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch batch statistics");
-      console.error("Error fetching batch stats:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use SWR hooks for data fetching with auto-refresh
+  const {
+    data: statsData,
+    error: statsError,
+    isLoading: statsLoading,
+    isValidating: statsValidating,
+    mutate: refreshStats
+  } = useBatchStats(batchId, timeRange, interval, {
+    // Use the refresh interval from the global context
+    refreshInterval: refreshInterval,
+    // These options should let the SWR cache work properly with our refresh context
+    revalidateOnFocus: true,
+    revalidateIfStale: true,
+    // Don't dedupe too aggressively so we can see updates
+    dedupingInterval: 1000,
+  });
 
+  // Extract the stats data from the response
+  const stats = statsData as UsageStatsResponse | undefined;
+  const error = statsError ? (statsError as Error).message || "Failed to fetch batch statistics" : null;
+
+  // Refresh stats when timeRange or interval changes
   useEffect(() => {
-    fetchStats();
-  }, [batchId, timeRange, interval]);
+    refreshStats();
+  }, [timeRange, interval]);
 
   const navigateBack = () => {
     router.push(`/batches/${batchId}`);
@@ -134,12 +147,15 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
 
   return (
     <div>
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" onClick={navigateBack} className="mr-4">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Batch Details
-        </Button>
-        <h1 className="text-3xl font-bold">Batch Statistics</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Button variant="ghost" onClick={navigateBack} className="mr-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Batch Details
+          </Button>
+          <h1 className="text-3xl font-bold">Batch Statistics</h1>
+        </div>
+        <RefreshControl />
       </div>
 
       <div className="flex justify-between items-center mb-6">
@@ -179,6 +195,12 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
           <p className="text-sm text-muted-foreground">
             {stats ? formatTimeRange(timeRange) : "Loading..."}
           </p>
+          {/* Updating indicator */}
+          {statsValidating && (
+            <Badge variant="outline" className="ml-2 text-xs bg-blue-500/10">
+              Updating stats...
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -193,7 +215,7 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
         </Card>
       )}
 
-      {loading ? (
+      {statsLoading ? (
         <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
             <Card key={i}>

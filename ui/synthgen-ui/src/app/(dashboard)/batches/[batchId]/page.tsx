@@ -71,7 +71,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
       {/* Navigation Cards */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Card className="hover:bg-accent transition-colors cursor-pointer" onClick={navigateToTasks}>
-          <CardContent className="p-6 flex items-center justify-between">
+          <CardContent className="flex items-center justify-between">
             <div>
               <h3 className="text-xl font-bold mb-1">View Tasks</h3>
               <p className="text-muted-foreground">View all tasks in this batch with filtering options</p>
@@ -81,7 +81,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
         </Card>
 
         <Card className="hover:bg-accent transition-colors cursor-pointer" onClick={navigateToStats}>
-          <CardContent className="p-6 flex items-center justify-between">
+          <CardContent className="flex items-center justify-between">
             <div>
               <h3 className="text-xl font-bold mb-1">View Statistics</h3>
               <p className="text-muted-foreground">See detailed batch performance statistics</p>
@@ -90,7 +90,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
           </CardContent>
         </Card>
       </div>
-      
+
       {batchError && (
         <Card className="mb-4 border-red-500">
           <CardContent className="p-4">
@@ -135,7 +135,7 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                 <div>{getStatusBadge(batch.batch_status as TaskStatus)}</div>
               </div>
               <Progress value={calculateProgress()} className="h-2 mb-4" />
-              
+
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
@@ -255,39 +255,6 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                     </p>
                   )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Configuration Details Card */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle>Configuration</CardTitle>
-              <CardDescription>Additional batch configuration and metadata</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {(batch as any).model_config && (
-                  <details className="text-sm">
-                    <summary className="cursor-pointer font-medium mb-1">Model Configuration</summary>
-                    <div className="bg-secondary/50 rounded-lg p-3">
-                      <pre className="text-xs overflow-auto whitespace-pre-wrap max-h-40">
-                        {JSON.stringify((batch as any).model_config, null, 2)}
-                      </pre>
-                    </div>
-                  </details>
-                )}
-
-                {(batch as any).metadata && (
-                  <details className="text-sm">
-                    <summary className="cursor-pointer font-medium mb-1">Metadata</summary>
-                    <div className="bg-secondary/50 rounded-lg p-3">
-                      <pre className="text-xs overflow-auto whitespace-pre-wrap max-h-40">
-                        {JSON.stringify((batch as any).metadata, null, 2)}
-                      </pre>
-                    </div>
-                  </details>
-                )}
               </div>
             </CardContent>
           </Card>

@@ -10,6 +10,8 @@
 }
 
 :root {
+  --site-width: 1800px;
+  --content-padding: 2rem;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.147 0.004 49.25);
   --popover: oklch(1 0 0);
@@ -43,6 +45,12 @@
   --sidebar-ring: oklch(0.709 0.01 56.259);
   --background: oklch(1 0 0);
   --foreground: oklch(0.147 0.004 49.25);
+}
+
+.container {
+  max-width: var(--site-width);
+  padding-left: var(--content-padding);
+  padding-right: var(--content-padding);
 }
 
 .dark {

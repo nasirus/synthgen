@@ -115,6 +115,9 @@ export function RefreshProvider({ children }: RefreshProviderProps) {
     setIsRefreshing(true);
     setAutoRefreshTriggered(false);
     
+    // Trigger the manual refresh event
+    triggerManualRefreshEvent();
+    
     // Simulate or perform the actual refresh logic
     setTimeout(() => {
       setIsRefreshing(false);

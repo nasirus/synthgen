@@ -479,17 +479,30 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             </CardFooter>
           </Card>
 
-          <Card className="bg-black border-gray-800">
+          <Card>
             <CardHeader>
               <CardTitle>Performance Metrics</CardTitle>
               <CardDescription>
                 Response time and tokens per second over time
               </CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px]">
+            <CardContent>
               {stats.time_series.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart 
+                <ChartContainer 
+                  config={{
+                    avg_duration_seconds: {
+                      label: "Response Time (seconds)",
+                      color: "hsl(25, 95%, 53%)",  // Orange color
+                    },
+                    tokens_per_second: {
+                      label: "Tokens Per Second",
+                      color: "hsl(216, 98%, 52%)",  // Blue color
+                    },
+                  }}
+                  className="aspect-auto h-[300px] w-full"
+                >
+                  <ComposedChart
+                    accessibilityLayer
                     data={stats.time_series.map(point => ({
                       ...point,
                       avg_duration_seconds: point.avg_duration_ms / 1000,
@@ -499,95 +512,105 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                         hour12: false
                       })
                     }))}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 20,
+                      bottom: 0,
+                    }}
                   >
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="timestamp"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tickFormatter={(value) => `${value.toFixed(1)}s`}
+                      domain={['dataMin - 0.1', 'dataMax + 0.1']}
+                    />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      domain={['dataMin - 10', 'dataMax + 10']}
+                    />
+                    <ChartTooltip 
+                      cursor={false} 
+                      content={
+                        <ChartTooltipContent 
+                          indicator="line"
+                          labelFormatter={(label: string) => `Time: ${label}`}
+                        />
+                      } 
+                    />
                     <defs>
-                      <linearGradient id="orangeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f77f00" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#f77f00" stopOpacity={0.8} />
-                      </linearGradient>
-                      <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#90be6d" stopOpacity={0.6} />
-                        <stop offset="50%" stopColor="#c9a227" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#333" stopOpacity={0.1} />
+                      <linearGradient id="fillResponseTime" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="5%"
+                          stopColor="var(--color-avg_duration_seconds)"
+                          stopOpacity={0.8}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="var(--color-avg_duration_seconds)"
+                          stopOpacity={0.1}
+                        />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-                      tickMargin={5}
-                    />
-                    <YAxis 
-                      yAxisId="left"
-                      tickLine={false} 
-                      axisLine={false}
-                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-                      tickMargin={5}
-                      orientation="left"
-                      tickFormatter={(value) => `${value.toFixed(1)}s`}
-                      domain={[0, 'dataMax + 0.5']}
-                    />
-                    <YAxis 
-                      yAxisId="right"
-                      tickLine={false} 
-                      axisLine={false}
-                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-                      tickMargin={5}
-                      orientation="right"
-                      domain={[0, 'dataMax + 100']}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#111',
-                        border: '1px solid #333',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}
-                    />
                     <Area
                       yAxisId="left"
-                      type="monotone"
                       dataKey="avg_duration_seconds"
-                      fill="url(#areaGradient)"
-                      stroke="none"
-                      fillOpacity={0.5}
+                      type="natural"
+                      fill="url(#fillResponseTime)"
+                      fillOpacity={0.4}
+                      stroke="var(--color-avg_duration_seconds)"
                     />
-                    <Bar 
-                      yAxisId="left"
-                      dataKey="avg_duration_seconds" 
-                      fill="url(#orangeGradient)" 
-                      radius={[0, 0, 0, 0]}
-                      name="Response Time"
-                      barSize={30}
-                    />
-                    <Line 
+                    <Line
                       yAxisId="right"
-                      type="monotone" 
-                      dataKey="tokens_per_second" 
-                      stroke="#5390d9" 
-                      name="Tokens/Second"
+                      dataKey="tokens_per_second"
+                      type="natural"
+                      stroke="var(--color-tokens_per_second)"
                       strokeWidth={2}
-                      dot={{ stroke: '#5390d9', strokeWidth: 2, r: 4, fill: '#111' }}
-                      activeDot={{ stroke: '#5390d9', strokeWidth: 2, r: 6, fill: '#fff' }}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
                     />
+                    <ChartLegend content={<ChartLegendContent />} />
                   </ComposedChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               ) : (
-                <div className="flex items-center justify-center h-full border border-dashed border-gray-800 rounded-md">
+                <div className="flex items-center justify-center h-[300px] border border-dashed rounded-md">
                   <div className="text-center">
-                    <p className="mt-2 text-gray-400">
+                    <p className="mt-2 text-muted-foreground">
                       No data available for the selected time range
                     </p>
                   </div>
                 </div>
               )}
             </CardContent>
-            <CardFooter className="text-xs text-gray-400">
-              Average response time: {(stats.summary.average_response_time / 1000).toFixed(2)}s | 
-              Average tokens per second: {stats.summary.tokens_per_second.toFixed(2)}
+            <CardFooter>
+              <div className="flex w-full items-start gap-2 text-sm">
+                <div className="grid gap-2">
+                  <div className="flex items-center gap-2 font-medium leading-none">
+                    Avg. Response Time: {stats?.summary?.average_response_time 
+                      ? (stats.summary.average_response_time / 1000).toFixed(2) 
+                      : '0.00'}s • 
+                    Avg. Tokens/Sec: {stats?.summary?.tokens_per_second 
+                      ? stats.summary.tokens_per_second.toFixed(2) 
+                      : '0.00'}
+                  </div>
+                  <div className="leading-none text-muted-foreground">
+                    Showing performance metrics over time with {interval} intervals
+                  </div>
+                </div>
+              </div>
             </CardFooter>
           </Card>
 

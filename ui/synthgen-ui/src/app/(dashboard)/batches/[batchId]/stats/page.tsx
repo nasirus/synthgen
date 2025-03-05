@@ -586,6 +586,7 @@ export default function BatchStatsPage({ params }: { params: Promise<{ batchId: 
                       tickLine={false}
                       axisLine={false}
                       tickMargin={8}
+                      tickFormatter={(value) => value.toFixed(2)}
                       domain={['dataMin - 10', 'dataMax + 10']}
                     />
                     <ChartTooltip

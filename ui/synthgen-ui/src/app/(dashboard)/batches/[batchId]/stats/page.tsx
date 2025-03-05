@@ -24,7 +24,8 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
-  ComposedChart
+  ComposedChart,
+  LabelList
 } from "recharts";
 import {
   ChartConfig,
@@ -69,6 +70,18 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
     cached_tasks: {
       label: "Cached",
       color: "hsl(280 100% 70%)",  // purple-500
+    }
+  } satisfies ChartConfig;
+
+  // Define chart config for Token Usage chart
+  const tokenChartConfig = {
+    completion_tokens: {
+      label: "Completion",
+      color: "hsl(43, 74%, 49%)",  // amber-like color
+    },
+    prompt_tokens: {
+      label: "Prompt",
+      color: "hsl(95, 38%, 60%)",  // green-like color
     }
   } satisfies ChartConfig;
 
@@ -302,12 +315,14 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                     accessibilityLayer 
                     data={stats.time_series.map(point => ({
                       ...point,
+                      total_tasks_display: point.completed_tasks + point.failed_tasks + point.cached_tasks,
                       timestamp: new Date(point.timestamp).toLocaleTimeString([], { 
                         hour: '2-digit', 
                         minute: '2-digit',
                         hour12: false
                       })
                     }))}
+                    margin={{ top: 20, right: 10, left: 0, bottom: 0 }}
                   >
                     <CartesianGrid vertical={false} />
                     <XAxis
@@ -335,7 +350,23 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
                       stackId="a"
                       fill="var(--color-cached_tasks)" 
                       radius={[4, 4, 0, 0]} 
-                    />
+                    >
+                      <LabelList 
+                        dataKey="total_tasks_display" 
+                        position="top" 
+                        formatter={(value: number) => {
+                          if (value >= 1000000) return `${(value/1000000).toFixed(1)}M`;
+                          if (value >= 1000) return `${(value/1000).toFixed(1)}k`;
+                          return value;
+                        }}
+                        style={{ 
+                          fill: 'var(--foreground)', 
+                          fontSize: '10px', 
+                          fontWeight: 'bold',
+                          textShadow: '0px 0px 2px rgba(0,0,0,0.5)'
+                        }}
+                      />
+                    </Bar>
                   </BarChart>
                 </ChartContainer>
               ) : (
@@ -362,113 +393,89 @@ export default function BatchStatsPage({ params }: { params: { batchId: string }
             </CardFooter>
           </Card>
 
-          <Card className="bg-black border-gray-800">
+          <Card>
             <CardHeader>
               <CardTitle>Token Usage</CardTitle>
               <CardDescription>
                 Token consumption over the selected time period
               </CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px]">
+            <CardContent>
               {stats.time_series.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart 
+                <ChartContainer config={tokenChartConfig} className="aspect-auto h-[250px] w-full">
+                  <BarChart 
+                    accessibilityLayer 
                     data={stats.time_series.map(point => ({
                       ...point,
+                      total_tokens_display: point.prompt_tokens + point.completion_tokens,
                       timestamp: new Date(point.timestamp).toLocaleTimeString([], { 
                         hour: '2-digit', 
                         minute: '2-digit',
                         hour12: false
                       })
                     }))}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    margin={{ top: 20, right: 10, left: 0, bottom: 0 }}
                   >
-                    <defs>
-                      <linearGradient id="colorCached" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#9d4edd" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#9d4edd" stopOpacity={0.6} />
-                      </linearGradient>
-                      <linearGradient id="colorPrompt" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#90be6d" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#90be6d" stopOpacity={0.6} />
-                      </linearGradient>
-                      <linearGradient id="colorCompletion" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#c9a227" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#c9a227" stopOpacity={0.6} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      tickLine={false} 
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="timestamp"
+                      tickLine={false}
+                      tickMargin={10}
                       axisLine={false}
-                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-                      tickMargin={5}
                     />
-                    <YAxis 
-                      tickLine={false} 
-                      axisLine={false}
-                      tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-                      tickMargin={5}
-                      domain={[0, 'dataMax + 50000']}
-                      tickFormatter={(value) => {
-                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                        if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                        return value;
-                      }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#111',
-                        border: '1px solid #333',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}
-                      formatter={(value: number) => [value.toLocaleString(), '']}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="completion_tokens" 
-                      stroke="#c9a227"
-                      fill="url(#colorCompletion)"
-                      fillOpacity={1}
-                      stackId="1"
-                      name="Completion Tokens"
-                    />
-                    <Area 
-                      type="monotone" 
+                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar 
                       dataKey="prompt_tokens" 
-                      stroke="#90be6d"
-                      fill="url(#colorPrompt)"
-                      fillOpacity={1}
-                      stackId="1"
-                      name="Prompt Tokens"
+                      stackId="a"
+                      fill="var(--color-prompt_tokens)" 
+                      radius={[4, 4, 0, 0]} 
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="cached_tasks" 
-                      stroke="#9d4edd"
-                      fill="url(#colorCached)"
-                      fillOpacity={1}
-                      stackId="1"
-                      name="Cached"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                    <Bar 
+                      dataKey="completion_tokens" 
+                      stackId="a"
+                      fill="var(--color-completion_tokens)" 
+                      radius={[0, 0, 4, 4]} 
+                    >
+                      <LabelList 
+                        dataKey="total_tokens_display" 
+                        position="top" 
+                        formatter={(value: number) => {
+                          if (value >= 1000000) return `${(value/1000000).toFixed(1)}M`;
+                          if (value >= 1000) return `${(value/1000).toFixed(1)}k`;
+                          return value;
+                        }}
+                        style={{ 
+                          fill: 'var(--foreground)', 
+                          fontSize: '10px', 
+                          fontWeight: 'bold',
+                          textShadow: '0px 0px 2px rgba(0,0,0,0.5)'
+                        }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
               ) : (
-                <div className="flex items-center justify-center h-full border border-dashed border-gray-800 rounded-md">
+                <div className="flex items-center justify-center h-[250px] border border-dashed rounded-md">
                   <div className="text-center">
-                    <p className="mt-2 text-gray-400">
+                    <p className="mt-2 text-muted-foreground">
                       No data available for the selected time range
                     </p>
                   </div>
                 </div>
               )}
             </CardContent>
-            <CardFooter className="text-xs text-gray-400">
-              Total: {stats.summary.total_tokens.toLocaleString()} tokens | 
-              Prompt: {stats.summary.total_prompt_tokens.toLocaleString()} | 
-              Completion: {stats.summary.total_completion_tokens.toLocaleString()}
+            <CardFooter className="flex-col items-start gap-2 text-sm">
+              {stats.summary.total_tokens > 0 && (
+                <div className="flex gap-2 font-medium leading-none">
+                  Prompt: {stats.summary.total_prompt_tokens.toLocaleString()},
+                  Completion: {stats.summary.total_completion_tokens.toLocaleString()},
+                  Total: {stats.summary.total_tokens.toLocaleString()}
+                </div>
+              )}
+              <div className="leading-none text-muted-foreground">
+                Showing token usage over time with {interval} intervals
+              </div>
             </CardFooter>
           </Card>
 

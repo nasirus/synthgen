@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ArrowLeft, BarChart, Check, Clock, ClipboardList, Database, RefreshCw, X } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { AlertCircle, ArrowLeft, BarChart, Check, Clock, ClipboardList, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -92,23 +90,13 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
       ) : batch ? (
 
         <div className="flex justify-between gap-4 px-6 py-4 w-full">
-          <div className="w-1/4">
-            {/* Status & Progress Card */}
+          <div className="w-1/3">
+            {/* Combined Status & Task Statistics Card */}
             <Card className="shadow-sm h-full bg-background/30 border-border/50">
               <CardContent className="p-4">
                 <div className="flex justify-between items-center mb-2">
-                  <div className="text-base font-semibold">Status</div>
+                  <div className="text-base font-semibold">Task Statistics</div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {batch.duration ? (() => {
-                        const totalSeconds = batch.duration;
-                        const hours = Math.floor(totalSeconds / 3600);
-                        const minutes = Math.floor((totalSeconds % 3600) / 60);
-                        const seconds = totalSeconds % 60;
-                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                      })() : '00:00:00'}
-                    </span>
                     {getStatusBadge(batch.batch_status as TaskStatus)}
                   </div>
                 </div>
@@ -120,65 +108,48 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">Total</span>
-                  <span className="text-xl font-bold">{batch.total_tasks}</span>
-                </div>
+                <div className="grid grid-cols-2 gap-x-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Total</span>
+                    <span className="text-xl font-bold">{batch.total_tasks}</span>
+                  </div>
 
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">Completed</span>
-                  <span className="text-xl font-bold text-green-500">{batch.completed_tasks}</span>
-                </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Completed</span>
+                    <div className="flex items-center">
+                      <span className="text-xl font-bold text-green-500">{batch.completed_tasks}</span>
+                      <Check className="h-4 w-4 text-green-500 ml-1" />
+                    </div>
+                  </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Pending</span>
-                  <span className="text-xl font-bold text-amber-500">{batch.pending_tasks || 0}</span>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Failed</span>
+                    <div className="flex items-center">
+                      <span className="text-xl font-bold text-red-500">{batch.failed_tasks || 0}</span>
+                      <X className="h-4 w-4 text-red-500 ml-1" />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Pending</span>
+                    <span className="text-xl font-bold text-amber-500">{batch.pending_tasks || 0}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Processing</span>
+                    <span className="text-xl font-bold text-blue-500">{batch.processing_tasks || 0}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Cached</span>
+                    <span className="text-xl font-bold text-purple-500">{batch.cached_tasks || 0}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <div className="w-1/4">
-            {/* Task Statistics Card */}
-            <Card className="shadow-sm h-full bg-background/30 border-border/50">
-              <CardContent className="p-4">
-                <div className="text-base font-semibold mb-3">Task Statistics</div>
-
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Completed</span>
-                  <div className="flex items-center">
-                    <span className="text-xl font-bold text-green-500">{batch.completed_tasks}</span>
-                    <Check className="h-4 w-4 text-green-500 ml-1" />
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Failed</span>
-                  <div className="flex items-center">
-                    <span className="text-xl font-bold text-red-500">{batch.failed_tasks || 0}</span>
-                    <X className="h-4 w-4 text-red-500 ml-1" />
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Pending</span>
-                  <span className="text-xl font-bold text-amber-500">{batch.pending_tasks || 0}</span>
-                </div>
-
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">Processing</span>
-                  <span className="text-xl font-bold text-blue-500">{batch.processing_tasks || 0}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Cached</span>
-                  <span className="text-xl font-bold text-purple-500">{batch.cached_tasks || 0}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="w-1/4">
+          <div className="w-1/3">
             {/* Token Usage Card */}
             <Card className="shadow-sm h-full bg-background/30 border-border/50">
               <CardContent className="p-4">
@@ -212,11 +183,25 @@ export default function BatchDetailPage({ params }: { params: { batchId: string 
             </Card>
           </div>
 
-          <div className="w-1/4">
+          <div className="w-1/3">
             {/* Timeline Card */}
             <Card className="shadow-sm h-full bg-background/30 border-border/50">
               <CardContent className="p-4">
                 <div className="text-base font-semibold mb-3">Timeline</div>
+
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm font-medium">Duration</span>
+                  <span className="text-sm flex items-center">
+                    <Clock className="h-4 w-4 mr-1" />
+                    {batch.duration ? (() => {
+                      const totalSeconds = batch.duration;
+                      const hours = Math.floor(totalSeconds / 3600);
+                      const minutes = Math.floor((totalSeconds % 3600) / 60);
+                      const seconds = totalSeconds % 60;
+                      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    })() : '00:00:00'}
+                  </span>
+                </div>
 
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm font-medium">Created</span>

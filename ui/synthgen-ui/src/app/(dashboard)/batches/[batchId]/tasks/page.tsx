@@ -15,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { useBatchTasks } from "@/lib/hooks";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSWRFetch } from "@/lib/hooks/useSWRFetch";
 
 export default function BatchTasksPage({ params }: { params: Promise<{ batchId: string }> }) {
   // Unwrap params using React.use()
@@ -27,6 +30,10 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
   useRefreshContext();
   // Get refresh interval from context to use in our SWR config
   const { refreshInterval } = useRefreshTrigger();
+
+  // Add state for the task dialog
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const {
     data: tasksData,
@@ -43,6 +50,15 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
     // Don't dedupe too aggressively so we can see updates
     dedupingInterval: 1000,
   });
+
+  // Fetch the selected task details only when needed
+  const shouldFetchTask = Boolean(selectedTaskId && dialogOpen);
+  const taskFetchKey = shouldFetchTask ? `/api/v1/tasks/${selectedTaskId}` : null;
+  
+  const {
+    data: selectedTaskData,
+    isLoading: selectedTaskLoading
+  } = useSWRFetch(taskFetchKey as string);
 
   // Access tasks directly without useMemo since we're not transforming the data
   const tasks = tasksData?.tasks || [];
@@ -70,6 +86,11 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
 
   const getStatusBadge = (status: TaskStatus) => {
     return <StatusBadge status={status} />;
+  };
+
+  const handleTaskClick = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setDialogOpen(true);
   };
 
   return (
@@ -174,7 +195,11 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
                 </TableHeader>
                 <TableBody>
                   {tasks.map((task) => (
-                    <TableRow key={task.message_id}>
+                    <TableRow 
+                      key={task.message_id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleTaskClick(task.message_id)}
+                    >
                       <TableCell className="font-medium whitespace-nowrap">{task.message_id}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         {task.completed_at ? new Date(task.completed_at).toLocaleString() : 'N/A'}
@@ -206,6 +231,34 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
           )}
         </CardContent>
       </Card>
+
+      {/* Task Details Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[85vw] md:max-w-[75vw] lg:max-w-[65vw] max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Task Details</DialogTitle>
+            <DialogDescription>
+              Complete information for task ID: {selectedTaskId}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="h-[65vh] rounded-md border p-4 bg-muted/50">
+            {selectedTaskLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Skeleton className="h-[400px] w-full" />
+              </div>
+            ) : selectedTaskData ? (
+              <pre className="text-xs whitespace-pre-wrap overflow-auto">
+                {JSON.stringify(selectedTaskData, null, 2)}
+              </pre>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                No task data available
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

@@ -187,7 +187,7 @@ export default function BatchStatsPage({ params }: { params: Promise<{ batchId: 
             <div className="flex items-center">
               <p className="text-sm font-medium mr-2">Range:</p>
               <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger className="w-[130px] h-8">
+                <SelectTrigger className="w-[135px] h-8">
                   <SelectValue placeholder="Select time range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -202,7 +202,7 @@ export default function BatchStatsPage({ params }: { params: Promise<{ batchId: 
             <div className="flex items-center">
               <p className="text-sm font-medium mr-2">Interval:</p>
               <Select value={interval} onValueChange={setInterval}>
-                <SelectTrigger className="w-[130px] h-8">
+                <SelectTrigger className="w-[105px] h-8">
                   <SelectValue placeholder="Select interval" />
                 </SelectTrigger>
                 <SelectContent>

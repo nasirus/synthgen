@@ -49,9 +49,12 @@ export default function BatchesPage() {
       setDeleteLoading(true);
       await batchesService.deleteBatch(batchToDelete);
       setIsDeleteDialogOpen(false);
+      
+      // Add a small delay to ensure Elasticsearch has time to process the deletion and refresh
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Manually trigger a refresh of the data
-      refreshBatches();
+      // Use more forceful refresh strategy
+      // First trigger the manual global refresh
       refreshNow();
     } catch (err) {
       console.error("Error deleting batch:", err);

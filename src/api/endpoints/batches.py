@@ -399,7 +399,9 @@ async def delete_batch(
     try:
         # Delete all documents with the given batch_id
         await es_client.client.delete_by_query(
-            index="events", body={"query": {"term": {"batch_id": batch_id}}}
+            index="events", 
+            body={"query": {"term": {"batch_id": batch_id}}},
+            refresh=True  # Force immediate refresh
         )
 
         logger.info(f"Successfully deleted batch {batch_id}")

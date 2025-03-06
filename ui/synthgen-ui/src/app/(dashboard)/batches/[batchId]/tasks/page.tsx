@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ArrowLeft, BarChart, CheckCircle, Clock, ClipboardList, TrendingUp, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, BarChart, CheckCircle, Clock, ClipboardList, TrendingUp, XCircle, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -15,9 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import { useBatchTasks } from "@/lib/hooks";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSWRFetch } from "@/lib/hooks/useSWRFetch";
+import { toast } from "sonner";
+import { Loader2Icon } from "lucide-react";
+import { tasksService } from "@/services/api";
 
 export default function BatchTasksPage({ params }: { params: Promise<{ batchId: string }> }) {
   // Unwrap params using React.use()
@@ -27,13 +30,16 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
   // Use the TaskStatus type for better type safety
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("COMPLETED");
   const router = useRouter();
-  useRefreshContext();
+  const { refreshNow } = useRefreshContext();
   // Get refresh interval from context to use in our SWR config
   const { refreshInterval } = useRefreshTrigger();
 
   // Add state for the task dialog
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const {
     data: tasksData,
@@ -91,6 +97,41 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
   const handleTaskClick = (taskId: string) => {
     setSelectedTaskId(taskId);
     setDialogOpen(true);
+  };
+
+  // Delete task handler
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+
+    try {
+      setDeleteLoading(true);
+      await tasksService.deleteTask(taskToDelete);
+      setIsDeleteDialogOpen(false);
+      
+      // Add a small delay to ensure Elasticsearch has time to process the deletion
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh data
+      refreshNow();
+      
+      // Show success toast with green background
+      toast.success("Task deleted successfully", {
+        style: { backgroundColor: "rgb(22 163 74)", color: "white" },
+      });
+    } catch (err) {
+      console.error("Error deleting task:", err);
+      // Show error toast
+      toast.error("Failed to delete task");
+    } finally {
+      setDeleteLoading(false);
+      setTaskToDelete(null);
+    }
+  };
+
+  // Open delete dialog
+  const confirmDeleteTask = (taskId: string) => {
+    setTaskToDelete(taskId);
+    setIsDeleteDialogOpen(true);
   };
 
   return (
@@ -191,6 +232,7 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
                     <TableHead>Prompt</TableHead>
                     <TableHead>Completion</TableHead>
                     <TableHead>Cached</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -223,6 +265,18 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
                       <TableCell>
                         {task.cached ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-500" />}
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmDeleteTask(task.message_id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -231,6 +285,35 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Task</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this task? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={deleteLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteTask}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? <Loader2Icon className="h-4 w-4 animate-spin mr-2" /> : null}
+              {deleteLoading ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Task Details Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

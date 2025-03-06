@@ -465,7 +465,7 @@ class ElasticsearchClient:
         Returns the number of documents deleted.
         """
         query = {"query": {"term": {"message_id": message_id}}}
-        result = await self.client.delete_by_query(index="events", body=query)
+        result = await self.client.delete_by_query(index="events", body=query, refresh=True)
         return result.get("deleted", 0)
 
     async def delete_task_by_hash(self, hash: str) -> int:
@@ -474,7 +474,7 @@ class ElasticsearchClient:
         Returns the number of documents deleted.
         """
         query = {"query": {"term": {"body_hash": hash}}}
-        result = await self.client.delete_by_query(index="events", body=query)
+        result = await self.client.delete_by_query(index="events", body=query, refresh=True)
         return result.get("deleted", 0)
 
     async def get_batch_usage_stats(

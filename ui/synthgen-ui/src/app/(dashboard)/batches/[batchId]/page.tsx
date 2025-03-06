@@ -241,7 +241,7 @@ export default function BatchDetailPage({ params }: { params: Promise<{ batchId:
                     <div key={index} className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.fill }} />
                       <span className="text-xs capitalize">{entry.status}</span>
-                      <span className="text-xs font-medium ml-1">{entry.count}</span>
+                      <span className="text-xs font-medium ml-1">{entry.count.toLocaleString()}</span>
                     </div>
                   ))}
                 </div>

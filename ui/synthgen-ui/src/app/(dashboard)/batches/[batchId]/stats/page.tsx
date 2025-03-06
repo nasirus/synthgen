@@ -686,7 +686,9 @@ export default function BatchStatsPage({ params }: { params: Promise<{ batchId: 
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.time_series.map((point: TimeSeriesDataPoint, index: number) => (
+                    {[...stats.time_series]
+                      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                      .map((point: TimeSeriesDataPoint, index: number) => (
                       <tr key={index} className="border-b hover:bg-muted/50">
                         <td className="py-2 px-4">
                           {new Date(point.timestamp).toLocaleString()}

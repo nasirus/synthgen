@@ -87,7 +87,6 @@ services:
         limits:
           cpus: "1"
           memory: 1024M
-    container_name: consumer
     environment:
       - CONSUMER_ID=${CONSUMER_ID:-1}
     depends_on:
@@ -138,7 +137,6 @@ services:
         limits:
           cpus: "1"
           memory: 1024M
-    container_name: worker
     depends_on:
       rabbitmq:
         condition: service_healthy

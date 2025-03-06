@@ -165,7 +165,7 @@ export default function DashboardPage() {
                                                 <Skeleton className="h-6 w-10" />
                                             ) : (
                                                 <div className="flex items-center">
-                                                    {health?.services.task_queue_messages || 0}
+                                                    {(health?.services.task_queue_messages || 0).toLocaleString()}
                                                     {(health?.services.task_queue_messages || 0) > 0 && (
                                                         <span className="ml-1.5 text-xs animate-pulse text-amber-500">●</span>
                                                     )}
@@ -211,7 +211,7 @@ export default function DashboardPage() {
                                                 <Skeleton className="h-6 w-10" />
                                             ) : (
                                                 <div className="flex items-center">
-                                                    {health?.services.batch_queue_messages || 0}
+                                                    {health?.services.batch_queue_messages.toLocaleString() || 0}
                                                     {(health?.services.batch_queue_messages || 0) > 0 && (
                                                         <span className="ml-1.5 text-xs animate-pulse text-amber-500">●</span>
                                                     )}
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                                             {loading ? (
                                                 <Skeleton className="h-6 w-10" />
                                             ) : (
-                                                health?.services.batch_queue_consumers || 0
+                                                health?.services.batch_queue_consumers.toLocaleString() || 0
                                             )}
                                         </div>
                                     </div>

@@ -35,9 +35,7 @@ export default function BatchesPage() {
   const {
     data,
     error,
-    isLoading,
-    mutate: refreshBatches
-  } = useBatches();
+    isLoading } = useBatches();
 
   // Extract batches from data
   const batches = data?.batches || [];
@@ -50,14 +48,14 @@ export default function BatchesPage() {
       setDeleteLoading(true);
       await batchesService.deleteBatch(batchToDelete);
       setIsDeleteDialogOpen(false);
-      
+
       // Add a small delay to ensure Elasticsearch has time to process the deletion and refresh
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Use more forceful refresh strategy
       // First trigger the manual global refresh
       refreshNow();
-      
+
       // Show success toast with green background
       toast.success("Batch deleted successfully", {
         style: { backgroundColor: "rgb(22 163 74)", color: "white" },

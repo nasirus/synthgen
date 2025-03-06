@@ -1,6 +1,7 @@
 "use client";
 
 import { Header } from "@/components/layout/header";
+import { Toaster } from "@/components/ui/sonner";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -31,6 +32,7 @@ export default function DashboardLayout({
       {isAuthenticated && <Header />}
       <main className="flex-1 p-6">
         <div className="container mx-auto">{children}</div>
+        <Toaster />
       </main>
       <footer className="border-t py-4">
         <div className="container mx-auto flex justify-center text-sm text-muted-foreground">

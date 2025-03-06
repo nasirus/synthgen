@@ -22,6 +22,7 @@ import { useBatches } from "@/lib/hooks";
 import { batchesService } from "@/services/api";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext } from "@/contexts/refresh-context";
+import { toast } from "sonner";
 
 export default function BatchesPage() {
   const [batchToDelete, setBatchToDelete] = useState<string | null>(null);
@@ -56,8 +57,15 @@ export default function BatchesPage() {
       // Use more forceful refresh strategy
       // First trigger the manual global refresh
       refreshNow();
+      
+      // Show success toast with green background
+      toast.success("Batch deleted successfully", {
+        style: { backgroundColor: "rgb(22 163 74)", color: "white" },
+      });
     } catch (err) {
       console.error("Error deleting batch:", err);
+      // Show error toast
+      toast.error("Failed to delete batch");
     } finally {
       setDeleteLoading(false);
       setBatchToDelete(null);

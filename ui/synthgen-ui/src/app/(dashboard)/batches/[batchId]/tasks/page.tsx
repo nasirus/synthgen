@@ -12,15 +12,13 @@ import { formatDistanceToNow } from "date-fns";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { useBatchTasks } from "@/lib/hooks";
+import { useBatchTasks, useSWRFetch, tasksService } from "@/lib/api";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useSWRFetch } from "@/lib/hooks/useSWRFetch";
 import { toast } from "sonner";
 import { Loader2Icon } from "lucide-react";
-import { tasksService } from "@/services/api";
 
 export default function BatchTasksPage({ params }: { params: Promise<{ batchId: string }> }) {
   // Unwrap params using React.use()
@@ -102,29 +100,25 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
   // Delete task handler
   const handleDeleteTask = async () => {
     if (!taskToDelete) return;
-
+    setDeleteLoading(true);
+    
     try {
-      setDeleteLoading(true);
-      await tasksService.deleteTask(taskToDelete);
-      setIsDeleteDialogOpen(false);
+      const response = await tasksService.deleteTask(taskToDelete);
       
-      // Add a small delay to ensure Elasticsearch has time to process the deletion
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Refresh data
-      refreshNow();
-      
-      // Show success toast with green background
-      toast.success("Task deleted successfully", {
-        style: { backgroundColor: "rgb(22 163 74)", color: "white" },
-      });
-    } catch (err) {
-      console.error("Error deleting task:", err);
-      // Show error toast
-      toast.error("Failed to delete task");
+      if (response.status === 200 || response.status === 204) {
+        toast.success("Task deleted successfully");
+        setIsDeleteDialogOpen(false);
+        setTaskToDelete(null);
+        // Refresh data
+        refreshNow();
+      } else {
+        toast.error("Failed to delete task");
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      toast.error("Error deleting task");
     } finally {
       setDeleteLoading(false);
-      setTaskToDelete(null);
     }
   };
 

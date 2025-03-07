@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/chart";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
-import { useBatchStats } from "@/lib/hooks";
+import { useBatchStats } from "@/lib/api";
 
 // Import recharts components inside the component
 import {

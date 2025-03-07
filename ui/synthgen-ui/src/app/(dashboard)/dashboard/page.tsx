@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner, FaRobot, FaFileAlt, FaCoins } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useHealthCheck, useBatches, useTaskStats } from "@/lib/hooks";
+import { useHealth, useBatches, useTaskStats } from "@/lib/api";
 import { Batch } from "@/lib/types";
 import { useRefreshContext } from "@/contexts/refresh-context";
 
@@ -19,7 +19,7 @@ export default function DashboardPage() {
     // Use SWR hooks for auto-refreshing data
     const {
         data: health,
-        isLoading: healthLoading } = useHealthCheck();
+        isLoading: healthLoading } = useHealth();
 
     const {
         data: batchesData,

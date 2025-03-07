@@ -35,9 +35,7 @@ services:
           memory: 512M
     container_name: ui
     ports:
-      - "${UI_PORT:-3000}:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT:-8002}
+      - "3000:3000"
     depends_on:
       api:
         condition: service_healthy

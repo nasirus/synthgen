@@ -18,8 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useBatches } from "@/lib/hooks";
-import { batchesService } from "@/services/api";
+import { useBatches, batchesService } from "@/lib/api";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext } from "@/contexts/refresh-context";
 import { toast } from "sonner";
@@ -35,7 +34,8 @@ export default function BatchesPage() {
   const {
     data,
     error,
-    isLoading } = useBatches();
+    isLoading,
+    mutate } = useBatches();
 
   // Extract batches from data
   const batches = data?.batches || [];
@@ -43,30 +43,24 @@ export default function BatchesPage() {
   // Delete batch handler
   const handleDeleteBatch = async () => {
     if (!batchToDelete) return;
-
+    
+    setDeleteLoading(true);
     try {
-      setDeleteLoading(true);
-      await batchesService.deleteBatch(batchToDelete);
-      setIsDeleteDialogOpen(false);
-
-      // Add a small delay to ensure Elasticsearch has time to process the deletion and refresh
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Use more forceful refresh strategy
-      // First trigger the manual global refresh
-      refreshNow();
-
-      // Show success toast with green background
-      toast.success("Batch deleted successfully", {
-        style: { backgroundColor: "rgb(22 163 74)", color: "white" },
-      });
-    } catch (err) {
-      console.error("Error deleting batch:", err);
-      // Show error toast
-      toast.error("Failed to delete batch");
+      const response = await batchesService.deleteBatch(batchToDelete);
+      
+      if (response.status === 200 || response.status === 204) {
+        toast.success("Batch deleted successfully");
+        // Close dialog & refresh data
+        setIsDeleteDialogOpen(false);
+        mutate();
+      } else {
+        toast.error("Failed to delete batch");
+      }
+    } catch (error) {
+      console.error("Error deleting batch:", error);
+      toast.error("Error deleting batch");
     } finally {
       setDeleteLoading(false);
-      setBatchToDelete(null);
     }
   };
 

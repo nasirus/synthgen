@@ -12,7 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { useBatchTasks, useSWRFetch, tasksService } from "@/lib/api";
+import { useBatchTasks, useSWRFetch, tasksService } from "@/lib/api/client";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";

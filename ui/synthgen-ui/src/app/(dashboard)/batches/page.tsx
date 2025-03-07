@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useBatches, batchesService } from "@/lib/api";
+import { useBatches, batchesService } from "@/lib/api/client";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext } from "@/contexts/refresh-context";
 import { toast } from "sonner";
@@ -28,7 +28,7 @@ export default function BatchesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const router = useRouter();
-  const { refreshNow } = useRefreshContext();
+  useRefreshContext();
 
   // Use SWR hook for auto-refreshing batches
   const {

@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Centralized API Hooks
  * 
@@ -7,7 +9,8 @@
 
 import useSWR, { SWRConfiguration } from 'swr';
 import { useEffect } from 'react';
-import { swrFetcher, API_ENDPOINTS } from '@/lib/api';
+import { API_ENDPOINTS } from './index';
+import { swrFetcher } from './index';
 import { useRefreshTrigger } from '@/contexts/refresh-context';
 import type { 
   Batch, 

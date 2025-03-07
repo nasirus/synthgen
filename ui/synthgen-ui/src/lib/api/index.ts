@@ -2,7 +2,7 @@ import { API_BASE_URL } from '@/lib/config';
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data: T;
   status: number;
   error?: string;
@@ -81,7 +81,7 @@ export const apiClient = createApiClient();
 export const apiRequest = async <T>(
   method: 'get' | 'post' | 'put' | 'delete', 
   url: string, 
-  data?: any, 
+  data?: unknown, 
   config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> => {
   try {
@@ -100,17 +100,20 @@ export const apiRequest = async <T>(
       case 'delete':
         response = await apiClient.delete(url, config);
         break;
+      default:
+        throw new Error('Invalid method');
     }
     
     return {
       data: response.data,
       status: response.status
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { response?: { status?: number, data?: { message?: string } }, message?: string };
     return {
-      data: null as any,
-      status: error.response?.status || 500,
-      error: error.response?.data?.message || error.message || 'Unknown error'
+      data: null as unknown as T,
+      status: err.response?.status || 500,
+      error: err.response?.data?.message || err.message || 'Unknown error'
     };
   }
 };
@@ -126,14 +129,15 @@ export const swrFetcher = async <T>(url: string): Promise<T> => {
   return response.data;
 };
 
-// Re-export from services and hooks
+// Re-export from services (server-safe)
 export * from './services';
-export * from './hooks';
 
-// Export default object for importing everything at once
-export default {
+// Export default object for importing everything at once (server-safe version)
+const apiExports = {
   client: apiClient,
   request: apiRequest,
   fetcher: swrFetcher,
   endpoints: API_ENDPOINTS
-}; 
+};
+
+export default apiExports; 

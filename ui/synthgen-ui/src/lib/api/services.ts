@@ -5,7 +5,8 @@
  * using the centralized API management system.
  */
 
-import { apiRequest, API_ENDPOINTS } from '@/lib/api';
+import { apiRequest } from './index';
+import { API_ENDPOINTS } from './index';
 import type { 
   Batch, 
   BatchListResponse, 

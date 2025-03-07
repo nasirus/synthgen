@@ -53,10 +53,10 @@ export async function GET(
                 },
             });
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("API route error:", error);
         return NextResponse.json(
-            { error: error.message || "Internal Server Error" },
+            { error: error instanceof Error ? error.message : "Internal Server Error" },
             { status: 500 }
         );
     }
@@ -114,10 +114,10 @@ export async function POST(
                 },
             });
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("API route error:", error);
         return NextResponse.json(
-            { error: error.message || "Internal Server Error" },
+            { error: error instanceof Error ? error.message : "Internal Server Error" },
             { status: 500 }
         );
     }
@@ -171,10 +171,10 @@ export async function DELETE(
                 },
             });
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("API route error:", error);
         return NextResponse.json(
-            { error: error.message || "Internal Server Error" },
+            { error: error instanceof Error ? error.message : "Internal Server Error" },
             { status: 500 }
         );
     }

@@ -29,7 +29,7 @@ export default function LoginPage() {
             login(API_KEY);
             router.push("/dashboard");
         }
-    }, [API_KEY, isAuthenticated, login, router]);
+    }, [isAuthenticated, login, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

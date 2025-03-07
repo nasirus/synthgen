@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FaServer, FaDatabase, FaExchangeAlt, FaClipboardList, FaTasks, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSpinner, FaRobot, FaFileAlt, FaCoins } from "react-icons/fa";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useHealth, useBatches, useTaskStats } from "@/lib/api";
+import { useHealth, useBatches, useTaskStats } from "@/lib/api/client";
 import { Batch } from "@/lib/types";
 import { useRefreshContext } from "@/contexts/refresh-context";
 

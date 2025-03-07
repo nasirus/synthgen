@@ -9,7 +9,7 @@ import { AlertCircle, ArrowLeft, BarChart, Clock, ClipboardList, TrendingUp } fr
 import { Progress } from "@/components/ui/progress";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useBatch } from "@/lib/api";
+import { useBatch } from "@/lib/api/client";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
 import { Pie, PieChart, Cell, Label } from "recharts";

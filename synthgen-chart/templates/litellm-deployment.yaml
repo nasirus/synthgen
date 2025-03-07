@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-litellm"
+  labels:
+    app: "{{ .Release.Name }}-litellm"
+    app.kubernetes.io/name: "{{ .Release.Name }}-litellm"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-litellm"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}-litellm"
+    spec:
+      containers:
+      - name: litellm
+        image: "{{ .Values.litellm.image.repository }}:{{ .Values.litellm.image.tag }}"
+        imagePullPolicy: "{{ .Values.litellm.image.pullPolicy }}"
+        args: ["--config", "/app/config.yaml", "--detailed_debug"]
+        ports:
+        - name: http
+          containerPort: 4000
+        resources:
+          limits:
+            cpu: "{{ .Values.litellm.resources.limits.cpu }}"
+            memory: "{{ .Values.litellm.resources.limits.memory }}"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+      volumes:
+      - name: config-volume
+        configMap:
+          name: "{{ .Release.Name }}-litellm-config"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-litellm"
+  labels:
+    app: "{{ .Release.Name }}-litellm"
+    app.kubernetes.io/name: "{{ .Release.Name }}-litellm"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+spec:
+  type: "{{ .Values.litellm.service.type }}"
+  ports:
+  - port: {{ .Values.litellm.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: "{{ .Release.Name }}-litellm"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-litellm-config"
+  labels:
+    app: "{{ .Release.Name }}-litellm"
+    app.kubernetes.io/name: "{{ .Release.Name }}-litellm"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+data:
+  config.yaml: |
+    model_list:
+      - model_name: gemini-2.0-flash-001
+        litellm_params:
+          model: gemini/gemini-2.0-flash-001
+          api_key: os.environ/GEMINI_API_KEY
+      - model_name: gemini-2.0-flash-lite
+        litellm_params:
+          model: gemini/gemini-2.0-flash-lite
+          api_key: os.environ/GEMINI_API_KEY
+      - model_name: gemini-2.0-flash-thinking-exp-01-21
+        litellm_params:
+          model: gemini/gemini-2.0-flash-thinking-exp-01-21
+          api_key: os.environ/GEMINI_API_KEY
+      - model_name: Llama-3.3-70B-Instruct
+        litellm_params:
+          model: huggingface/meta-llama/Llama-3.3-70B-Instruct
+          api_key: os.environ/HUGGINGFACE_API_KEY 

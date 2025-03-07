@@ -1,0 +1,12 @@
+apiVersion: v2
+name: synthgen
+description: Helm chart for Synthetic Data Generation Framework
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - synthetic-data
+  - llm
+  - generative-ai
+maintainers:
+  - name: Platform Team 

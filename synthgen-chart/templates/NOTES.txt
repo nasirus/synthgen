@@ -1,0 +1,26 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+To get the application URL, run these commands:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else }}
+  kubectl port-forward svc/{{ .Release.Name }}-ui {{ .Values.ui.service.port }}:{{ .Values.ui.service.port }}
+  echo "Visit http://localhost:{{ .Values.ui.service.port }} to access the UI"
+  
+  kubectl port-forward svc/{{ .Release.Name }}-api {{ .Values.api.service.port }}:{{ .Values.api.service.port }}
+  echo "API is available at http://localhost:{{ .Values.api.service.port }}"
+{{- end }}
+
+For the RabbitMQ management console:
+  kubectl port-forward svc/{{ .Release.Name }}-rabbitmq {{ .Values.rabbitmq.service.managementPort }}:{{ .Values.rabbitmq.service.managementPort }}
+  echo "Visit http://localhost:{{ .Values.rabbitmq.service.managementPort }} to access RabbitMQ management console"
+
+For the Minio console:
+  kubectl port-forward svc/{{ .Release.Name }}-minio {{ .Values.minio.service.consolePort }}:{{ .Values.minio.service.consolePort }}
+  echo "Visit http://localhost:{{ .Values.minio.service.consolePort }} to access Minio console" 

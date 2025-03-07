@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-api"
+  labels:
+    app: "{{ .Release.Name }}-api"
+    app.kubernetes.io/name: "{{ .Release.Name }}-api"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-api"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}-api"
+    spec:
+      containers:
+      - name: api
+        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+        imagePullPolicy: "{{ .Values.api.image.pullPolicy }}"
+        ports:
+        - name: http
+          containerPort: 8000
+        resources:
+          limits:
+            cpu: "{{ .Values.api.resources.limits.cpu }}"
+            memory: "{{ .Values.api.resources.limits.memory }}"
+        envFrom:
+        - configMapRef:
+            name: "{{ .Release.Name }}-configmap"
+        - secretRef:
+            name: "{{ .Release.Name }}-secrets"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-api"
+  labels:
+    app: "{{ .Release.Name }}-api"
+    app.kubernetes.io/name: "{{ .Release.Name }}-api"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+spec:
+  type: "{{ .Values.api.service.type }}"
+  ports:
+  - port: "{{ .Values.api.service.port }}"
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: "{{ .Release.Name }}-api" 

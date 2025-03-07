@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-worker"
+  labels:
+    app: "{{ .Release.Name }}-worker"
+    app.kubernetes.io/name: "{{ .Release.Name }}-worker"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-worker"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}-worker"
+    spec:
+      containers:
+      - name: worker
+        image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+        imagePullPolicy: "{{ .Values.worker.image.pullPolicy }}"
+        resources:
+          limits:
+            cpu: "{{ .Values.worker.resources.limits.cpu }}"
+            memory: "{{ .Values.worker.resources.limits.memory }}"
+        envFrom:
+        - configMapRef:
+            name: "{{ .Release.Name }}-configmap" 

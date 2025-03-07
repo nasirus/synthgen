@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  RABBITMQ_HOST: "{{ .Release.Name }}-rabbitmq"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: "{{ .Values.rabbitmq.env.RABBITMQ_USER }}"
+  RABBITMQ_PASS: "{{ .Values.rabbitmq.env.RABBITMQ_PASS }}"
+  RETRY_ATTEMPTS: "10"
+  BASE_DELAY_MS: "10000"
+  MAX_DELAY_SECS: "300"
+  LLM_TIMEOUT: "60"
+  MINIO_HOST: "{{ .Release.Name }}-minio"
+  MINIO_PORT: "9000"
+  MINIO_ROOT_USER: "{{ .Values.minio.env.MINIO_ROOT_USER }}"
+  MINIO_ROOT_PASSWORD: "{{ .Values.minio.env.MINIO_ROOT_PASSWORD }}"
+  MINIO_BUCKET_NAME: "{{ .Values.minio.env.MINIO_BUCKET_NAME }}"
+  ELASTICSEARCH_HOST: "{{ .Release.Name }}-elasticsearch"
+  ELASTICSEARCH_PORT: "9200"
+  API_PORT: "{{ .Values.api.env.API_PORT }}"
+  NUM_WORKERS: "{{ .Values.worker.replicas }}"
+  NUM_CONSUMERS: "{{ .Values.consumer.replicas }}"
+  MAX_PARALLEL_TASKS: "10" 

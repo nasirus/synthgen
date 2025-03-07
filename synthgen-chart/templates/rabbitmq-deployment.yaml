@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-rabbitmq
+  labels:
+    app: {{ .Release.Name }}-rabbitmq
+    app.kubernetes.io/name: {{ .Release.Name }}-rabbitmq
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-rabbitmq
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-rabbitmq
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: rabbitmq
+        image: "{{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}"
+        imagePullPolicy: {{ .Values.rabbitmq.image.pullPolicy }}
+        ports:
+        - name: amqp
+          containerPort: 5672
+        - name: management
+          containerPort: 15672
+        resources:
+          {{- toYaml .Values.rabbitmq.resources | nindent 12 }}
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "{{ .Values.rabbitmq.env.RABBITMQ_USER }}"
+        - name: RABBITMQ_DEFAULT_PASS
+          value: "{{ .Values.rabbitmq.env.RABBITMQ_PASS }}"
+        - name: RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS
+          value: "{{ .Values.rabbitmq.env.RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS }}"
+        livenessProbe:
+          exec:
+            command: ["rabbitmqctl", "status"]
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command: ["rabbitmqctl", "status"]
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 30
+        volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
+      volumes:
+      - name: rabbitmq-data
+        {{- if .Values.rabbitmq.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-rabbitmq-pvc
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-rabbitmq
+  labels:
+    app: {{ .Release.Name }}-rabbitmq
+    app.kubernetes.io/name: {{ .Release.Name }}-rabbitmq
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.rabbitmq.service.type }}
+  ports:
+  - name: amqp
+    port: {{ .Values.rabbitmq.service.port }}
+    targetPort: amqp
+  - name: management
+    port: {{ .Values.rabbitmq.service.managementPort }}
+    targetPort: management
+  selector:
+    app: {{ .Release.Name }}-rabbitmq
+{{- if .Values.rabbitmq.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-rabbitmq-pvc
+  labels:
+    app: {{ .Release.Name }}-rabbitmq
+    app.kubernetes.io/name: {{ .Release.Name }}-rabbitmq
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.rabbitmq.persistence.size }}
+{{- end }} 

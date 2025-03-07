@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-minio"
+  labels:
+    app: "{{ .Release.Name }}-minio"
+    app.kubernetes.io/name: "{{ .Release.Name }}-minio"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-minio"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}-minio"
+    spec:
+      containers:
+      - name: minio
+        image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
+        imagePullPolicy: "{{ .Values.minio.image.pullPolicy }}"
+        command:
+        - "/bin/sh"
+        - "-c"
+        - "minio server /data --console-address :9001"
+        ports:
+        - name: api
+          containerPort: 9000
+        - name: console
+          containerPort: 9001
+        resources:
+          limits:
+            cpu: "{{ .Values.minio.resources.limits.cpu }}"
+            memory: "{{ .Values.minio.resources.limits.memory }}"
+        env:
+        - name: MINIO_ROOT_USER
+          value: "{{ .Values.minio.env.MINIO_ROOT_USER }}"
+        - name: MINIO_ROOT_PASSWORD
+          value: "{{ .Values.minio.env.MINIO_ROOT_PASSWORD }}"
+        livenessProbe:
+          tcpSocket:
+            port: api
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: api
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
+      volumes:
+      - name: minio-data
+        {{- if .Values.minio.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: "{{ .Release.Name }}-minio-pvc"
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-minio"
+  labels:
+    app: "{{ .Release.Name }}-minio"
+    app.kubernetes.io/name: "{{ .Release.Name }}-minio"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+spec:
+  type: "{{ .Values.minio.service.type }}"
+  ports:
+  - name: api
+    port: {{ .Values.minio.service.apiPort }}
+    targetPort: api
+  - name: console
+    port: {{ .Values.minio.service.consolePort }}
+    targetPort: console
+  selector:
+    app: "{{ .Release.Name }}-minio"
+{{- if .Values.minio.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "{{ .Release.Name }}-minio-pvc"
+  labels:
+    app: "{{ .Release.Name }}-minio"
+    app.kubernetes.io/name: "{{ .Release.Name }}-minio"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "{{ .Values.global.storageClass }}"
+  resources:
+    requests:
+      storage: "{{ .Values.minio.persistence.size }}"
+{{- end }} 

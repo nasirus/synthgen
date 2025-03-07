@@ -1,0 +1,161 @@
+global:
+  environment: production
+  imagePullSecrets: []
+  storageClass: standard
+
+# RabbitMQ configuration
+rabbitmq:
+  image:
+    repository: rabbitmq
+    tag: 4.0-management
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  service:
+    type: ClusterIP
+    port: 5672
+    managementPort: 15672
+  persistence:
+    enabled: true
+    size: 8Gi
+  env:
+    RABBITMQ_USER: guest
+    RABBITMQ_PASS: guest
+    RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbit consumer_timeout 3600000
+
+# UI configuration
+ui:
+  image:
+    repository: nasirus/synthgen-ui
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+  service:
+    type: ClusterIP
+    port: 3000
+  env:
+    NEXT_PUBLIC_API_URL: http://synthgen-api:8000
+
+# API configuration
+api:
+  replicas: 1
+  image:
+    repository: nasirus/synthgen-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  service:
+    type: ClusterIP
+    port: 8000
+  env:
+    API_PORT: 8002
+    API_SECRET_KEY: sk1-1564813548
+
+# Consumer configuration
+consumer:
+  replicas: 1
+  image:
+    repository: nasirus/synthgen-consumer
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  env:
+    CONSUMER_ID: 1
+
+# Minio configuration
+minio:
+  image:
+    repository: quay.io/minio/minio
+    tag: RELEASE.2025-02-07T23-21-09Z
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  service:
+    type: ClusterIP
+    apiPort: 9000
+    consolePort: 9001
+  persistence:
+    enabled: true
+    size: 10Gi
+  env:
+    MINIO_ROOT_USER: minioadmin
+    MINIO_ROOT_PASSWORD: minioadmin
+    MINIO_BUCKET_NAME: synthetic-data-generator
+
+# Worker configuration
+worker:
+  replicas: 1
+  image:
+    repository: nasirus/synthgen-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+# Elasticsearch configuration
+elasticsearch:
+  image:
+    repository: docker.elastic.co/elasticsearch/elasticsearch
+    tag: 8.17.1
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  service:
+    type: ClusterIP
+    port: 9200
+  persistence:
+    enabled: true
+    size: 10Gi
+  env:
+    ES_JAVA_OPTS: -Xms512m -Xmx512m
+    discovery.type: single-node
+    xpack.security.enabled: false
+
+# LiteLLM configuration
+litellm:
+  image:
+    repository: ghcr.io/berriai/litellm
+    tag: main-latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  service:
+    type: ClusterIP
+    port: 4000
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: synthgen.local
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: synthgen-ui
+          servicePort: 3000
+        - path: /api
+          pathType: Prefix
+          serviceName: synthgen-api
+          servicePort: 8000
+  tls: [] 

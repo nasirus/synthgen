@@ -30,6 +30,8 @@ spec:
         env:
         - name: NEXT_PUBLIC_API_URL
           value: "{{ .Values.ui.env.NEXT_PUBLIC_API_URL }}"
+# Note: In a real production environment, you might want to set this to the external URL
+# such as "http://HOSTNAME:30081" (the NodePort)
 ---
 apiVersion: v1
 kind: Service
@@ -42,9 +44,12 @@ metadata:
 spec:
   type: "{{ .Values.ui.service.type }}"
   ports:
-  - port: "{{ .Values.ui.service.port }}"
+  - port: {{ .Values.ui.service.port }}
     targetPort: http
     protocol: TCP
     name: http
+    {{- if eq .Values.ui.service.type "NodePort" }}
+    nodePort: {{ .Values.ui.service.nodePort }}
+    {{- end }}
   selector:
     app: "{{ .Release.Name }}-ui" 

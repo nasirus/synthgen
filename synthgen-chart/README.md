@@ -99,3 +99,23 @@ kubectl port-forward svc/synthgen-minio 9001:9001
 ```
 
 If ingress is enabled, you can access the UI and API through the configured host. 
+
+## Storage Class Handling
+
+This chart includes automatic storage class detection and fallback mechanisms to make it work across different Kubernetes environments:
+
+1. If a `standard` storage class exists, it will be used
+2. If no `standard` storage class exists but `hostpath` exists, the chart will create a `standard` storage class that uses the `hostpath` provisioner
+3. If neither exists, the chart creates a `standard` storage class with static PersistentVolumes for each component
+
+This makes the chart work out-of-the-box in most environments, including:
+- Docker Desktop Kubernetes
+- Minikube
+- Kind
+- Cloud providers (which typically have their own `standard` storage class)
+
+You can override this behavior by setting `global.storageClass` to specify a particular storage class:
+
+```bash
+helm install synthgen ./synthgen-chart --set global.storageClass=your-storage-class
+``` 

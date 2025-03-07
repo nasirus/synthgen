@@ -2,7 +2,7 @@
 
 param (
     [string]$n,
-    [string]$namespace = "default",
+    [string]$namespace = "synthgen",
     [string]$r,
     [string]$release = "synthgen",
     [string]$f,
@@ -11,7 +11,7 @@ param (
 
 # Set default values
 $ReleaseName = "synthgen"
-$Namespace = "default"
+$Namespace = "synthgen"
 $ValuesFile = ""
 
 # Use either the short or long form, preferring the long form

@@ -94,7 +94,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: {{ .Values.global.storageClass }}
+  storageClassName: {{ include "synthgen.storageClass" . }}
   resources:
     requests:
       storage: {{ .Values.rabbitmq.persistence.size }}

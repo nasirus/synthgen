@@ -10,11 +10,14 @@ To get the application URL, run these commands:
   {{- end }}
 {{- end }}
 {{- else }}
-  kubectl port-forward svc/{{ .Release.Name }}-ui {{ .Values.ui.service.port }}:{{ .Values.ui.service.port }}
-  echo "Visit http://localhost:{{ .Values.ui.service.port }} to access the UI"
-  
-  kubectl port-forward svc/{{ .Release.Name }}-api {{ .Values.api.service.port }}:{{ .Values.api.service.port }}
-  echo "API is available at http://localhost:{{ .Values.api.service.port }}"
+  # UI is available at:
+  http://CLUSTER_IP:{{ .Values.ui.service.nodePort }}
+
+  # API is available at:
+  http://CLUSTER_IP:{{ .Values.api.service.nodePort }}
+
+  # Replace CLUSTER_IP with the actual IP of any node in your cluster
+  # For Docker Desktop or Minikube, this is usually 'localhost'
 {{- end }}
 
 For the RabbitMQ management console:

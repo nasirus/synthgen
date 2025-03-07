@@ -16,10 +16,16 @@ spec:
       labels:
         app: "{{ .Release.Name }}-elasticsearch"
     spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
       - name: elasticsearch
         image: "{{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}"
         imagePullPolicy: "{{ .Values.elasticsearch.image.pullPolicy }}"
+        securityContext:
+          privileged: true
         ports:
         - name: http
           containerPort: 9200
@@ -89,7 +95,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: "{{ .Values.global.storageClass }}"
+  storageClassName: "{{ include "synthgen.storageClass" . }}"
   resources:
     requests:
       storage: "{{ .Values.elasticsearch.persistence.size }}"

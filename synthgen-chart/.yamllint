@@ -1,0 +1,7 @@
+yaml-files:
+  - '*.yaml'
+  - '*.yml'
+  - '.yamllint'
+ignore: |
+  templates/
+  charts/

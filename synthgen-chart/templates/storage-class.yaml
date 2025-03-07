@@ -1,0 +1,62 @@
+{{- if not (lookup "storage.k8s.io/v1" "StorageClass" "" "standard") }}
+{{- $hostpathExists := (lookup "storage.k8s.io/v1" "StorageClass" "" "hostpath") }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+{{- if $hostpathExists }}
+provisioner: docker.io/hostpath
+{{- else }}
+provisioner: kubernetes.io/no-provisioner
+{{- end }}
+volumeBindingMode: Immediate
+---
+# Create static PVs for each component
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "{{ .Release.Name }}-standard-fallback-pv-minio"
+spec:
+  capacity:
+    storage: {{ .Values.minio.persistence.size }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: standard
+  hostPath:
+    path: "/tmp/{{ .Release.Name }}-minio-data"
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "{{ .Release.Name }}-standard-fallback-pv-es"
+spec:
+  capacity:
+    storage: {{ .Values.elasticsearch.persistence.size }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: standard
+  hostPath:
+    path: "/tmp/{{ .Release.Name }}-es-data"
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "{{ .Release.Name }}-standard-fallback-pv-rabbitmq"
+spec:
+  capacity:
+    storage: {{ .Values.rabbitmq.persistence.size }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: standard
+  hostPath:
+    path: "/tmp/{{ .Release.Name }}-rabbitmq-data"
+    type: DirectoryOrCreate
+{{- end }} 

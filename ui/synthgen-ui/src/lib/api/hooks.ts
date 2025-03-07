@@ -9,7 +9,7 @@
 
 import useSWR, { SWRConfiguration } from 'swr';
 import { useEffect } from 'react';
-import { API_ENDPOINTS } from './index';
+import { API_ENDPOINTS } from './endpoints';
 import { swrFetcher } from './index';
 import { useRefreshTrigger } from '@/contexts/refresh-context';
 import type { 

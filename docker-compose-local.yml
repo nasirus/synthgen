@@ -12,6 +12,7 @@ services:
       - "15672:15672" # RabbitMQ management interface port
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq-definitions.json:/etc/rabbitmq/definitions.json
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
@@ -23,6 +24,7 @@ services:
       - synthetic-data-network
     environment:
       - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit consumer_timeout 3600000
+      - RABBITMQ_LOAD_DEFINITIONS=/etc/rabbitmq/definitions.json
 
   ui:
     build:

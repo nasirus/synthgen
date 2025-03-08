@@ -34,6 +34,8 @@ spec:
           value: "{{ .Values.ui.env.API_PORT }}"
         - name: API_SECRET_KEY
           value: "{{ .Values.ui.env.API_SECRET_KEY }}"
+        - name: NODE_ENV
+          value: "production"
 # Note: In a real production environment, you might want to set this to the external URL
 # such as "http://HOSTNAME:30081" (the NodePort)
 ---

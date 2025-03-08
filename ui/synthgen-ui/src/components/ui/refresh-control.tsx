@@ -3,7 +3,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -34,12 +33,6 @@ export function RefreshControl() {
 
     return (
         <div className="flex items-center gap-2">
-            {!isRefreshing && autoRefreshTriggered && (
-                <Badge variant="outline" className="bg-green-500/10 flex items-center justify-center w-8 h-8 p-1">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                </Badge>
-            )}
-
             <div className="flex items-center gap-2 border rounded-md p-1.5">
                 <TooltipProvider>
                     <Tooltip>
@@ -61,21 +54,37 @@ export function RefreshControl() {
                 </TooltipProvider>
 
                 {autoRefresh && (
-                    <Select
-                        value={refreshInterval}
-                        onValueChange={(value) => setRefreshInterval(value as RefreshIntervalKey)}
-                    >
-                        <SelectTrigger className="h-8 w-[70px]">
-                            <SelectValue placeholder="Interval" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Object.keys(REFRESH_INTERVALS).filter(key => key !== "Off").map((interval) => (
-                                <SelectItem key={interval} value={interval}>
-                                    {interval}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <>
+                        <Select
+                            value={refreshInterval}
+                            onValueChange={(value) => setRefreshInterval(value as RefreshIntervalKey)}
+                        >
+                            <SelectTrigger className="h-8 w-[70px]">
+                                <SelectValue placeholder="Interval" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.keys(REFRESH_INTERVALS).filter(key => key !== "Off").map((interval) => (
+                                    <SelectItem key={interval} value={interval}>
+                                        {interval}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Status indicator for auto-refresh */}
+                        <div className="relative h-8 w-8 flex items-center justify-center">
+                            {isRefreshing ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : autoRefreshTriggered ? (
+                                <>
+                                    <RefreshCw className="h-4 w-4 text-green-500" />
+                                    <span className="absolute top-1 right-1 h-2 w-2 bg-green-500 rounded-full" />
+                                </>
+                            ) : (
+                                <RefreshCw className="h-4 w-4 opacity-50" />
+                            )}
+                        </div>
+                    </>
                 )}
 
                 {!autoRefresh && (
@@ -84,9 +93,13 @@ export function RefreshControl() {
                         size="icon"
                         onClick={refreshNow}
                         disabled={isRefreshing}
-                        className="h-8 w-8"
+                        className="h-8 w-8 relative"
                     >
-                        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <RefreshCw className="h-4 w-4" />
+                        )}
                         <span className="sr-only">Refresh</span>
                     </Button>
                 )}

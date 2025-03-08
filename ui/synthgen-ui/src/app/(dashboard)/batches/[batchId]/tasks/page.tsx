@@ -12,7 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { TaskStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { useBatchTasks, useSWRFetch, tasksService } from "@/lib/api/client";
+import { useBatchTasks, tasksService, useTask } from "@/lib/api/client";
 import { RefreshControl } from "@/components/ui/refresh-control";
 import { useRefreshContext, useRefreshTrigger } from "@/contexts/refresh-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -57,12 +57,19 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
 
   // Fetch the selected task details only when needed
   const shouldFetchTask = Boolean(selectedTaskId && dialogOpen);
-  const taskFetchKey = shouldFetchTask ? `/api/v1/tasks/${selectedTaskId}` : null;
-  
+
+  // Use the useTask hook with conditional fetching
   const {
     data: selectedTaskData,
     isLoading: selectedTaskLoading
-  } = useSWRFetch(taskFetchKey as string);
+  } = useTask(selectedTaskId || '', {
+    // This ensures we only fetch when dialog is open
+    refreshInterval: shouldFetchTask ? refreshInterval : 0,
+    // Skip fetching completely if shouldFetchTask is false
+    revalidateOnFocus: shouldFetchTask,
+    revalidateIfStale: shouldFetchTask,
+    revalidateOnMount: shouldFetchTask
+  });
 
   // Access tasks directly without useMemo since we're not transforming the data
   const tasks = tasksData?.tasks || [];
@@ -101,10 +108,10 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
   const handleDeleteTask = async () => {
     if (!taskToDelete) return;
     setDeleteLoading(true);
-    
+
     try {
       const response = await tasksService.deleteTask(taskToDelete);
-      
+
       if (response.status === 200 || response.status === 204) {
         toast.success("Task deleted successfully");
         setIsDeleteDialogOpen(false);
@@ -143,8 +150,8 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
           </Button>
           <Button onClick={navigateToStats} size="sm" variant="outline" className="h-8">
             <BarChart className="h-4 w-4 mr-1" /> Statistics
-          </Button>          
-          <Button onClick={() => {}} size="sm" variant="default" className="h-8">
+          </Button>
+          <Button onClick={() => { }} size="sm" variant="default" className="h-8">
             <ClipboardList className="h-4 w-4 mr-1" /> Tasks
           </Button>
           <RefreshControl />
@@ -231,8 +238,8 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
                 </TableHeader>
                 <TableBody>
                   {tasks.map((task) => (
-                    <TableRow 
-                      key={task.message_id} 
+                    <TableRow
+                      key={task.message_id}
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => handleTaskClick(task.message_id)}
                     >
@@ -318,11 +325,23 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
               Complete information for task ID: {selectedTaskId}
             </DialogDescription>
           </DialogHeader>
-          
+
           <ScrollArea className="h-[65vh] rounded-md border p-4 bg-muted/50">
             {selectedTaskLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <Skeleton className="h-[400px] w-full" />
+              <div className="space-y-4 p-2">
+                <div className="flex gap-2 items-center">
+                  <Skeleton className="h-5 w-20" />
+                  <Skeleton className="h-5 w-40" />
+                </div>
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <div className="py-2" />
+                <Skeleton className="h-40 w-full" />
+                <div className="py-2" />
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-4 w-3/5" />
               </div>
             ) : selectedTaskData ? (
               <pre className="text-xs whitespace-pre-wrap overflow-auto">

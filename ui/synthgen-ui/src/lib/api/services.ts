@@ -11,14 +11,14 @@ import type {
 // Health service
 export const healthService = {
   getHealthCheck: async () => {
-    return apiRequest('get', API_ENDPOINTS.HEALTH);
+    return apiRequest('get', API_ENDPOINTS.HEALTH());
   },
 };
 
 // Batches service
 export const batchesService = {
   getBatches: async () => {
-    return apiRequest<BatchListResponse>('get', API_ENDPOINTS.BATCHES);
+    return apiRequest<BatchListResponse>('get', API_ENDPOINTS.BATCHES());
   },
 
   getBatch: async (batchId: string) => {
@@ -49,6 +49,6 @@ export const tasksService = {
   },
 
   getTaskStats: async () => {
-    return apiRequest<TaskStatsResponse>('get', API_ENDPOINTS.TASK_STATS);
+    return apiRequest<TaskStatsResponse>('get', API_ENDPOINTS.TASK_STATS());
   },
 }; 

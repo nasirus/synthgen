@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { API_BASE_URL } from "@/lib/config";
+import { getApiBaseUrl } from "@/lib/config";
 
 // Next.js App Router pattern for route handlers with Promise-based params
 export async function GET(
@@ -16,7 +16,7 @@ export async function GET(
 
         // Fix: Ensure we don't have any leading slashes in path to prevent double slashes
         const formattedPath = path.startsWith('/') ? path.substring(1) : path;
-        const url = `${API_BASE_URL}/${formattedPath}${queryString}`;
+        const url = `${getApiBaseUrl()}/${formattedPath}${queryString}`;
 
         // Get the Authorization header from the incoming request
         const authHeader = request.headers.get("Authorization");
@@ -74,7 +74,7 @@ export async function POST(
 
         // Fix: Ensure we don't have any leading slashes in path to prevent double slashes
         const formattedPath = path.startsWith('/') ? path.substring(1) : path;
-        const url = `${API_BASE_URL}/${formattedPath}`;
+        const url = `${getApiBaseUrl()}/${formattedPath}`;
 
         // Get the Authorization header from the incoming request
         const authHeader = request.headers.get("Authorization");
@@ -135,7 +135,7 @@ export async function DELETE(
 
         // Fix: Ensure we don't have any leading slashes in path to prevent double slashes
         const formattedPath = path.startsWith('/') ? path.substring(1) : path;
-        const url = `${API_BASE_URL}/${formattedPath}`;
+        const url = `${getApiBaseUrl()}/${formattedPath}`;
 
         // Get the Authorization header from the incoming request
         const authHeader = request.headers.get("Authorization");

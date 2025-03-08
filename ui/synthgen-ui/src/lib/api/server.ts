@@ -27,14 +27,14 @@ export async function serverFetch<T>(url: string, apiKey?: string): Promise<T> {
 // Health service
 export const serverHealthService = {
   getHealthCheck: async () => {
-    return serverFetch(API_ENDPOINTS.HEALTH);
+    return serverFetch(API_ENDPOINTS.HEALTH());
   },
 };
 
 // Batches service
 export const serverBatchesService = {
   getBatches: async () => {
-    return serverFetch(API_ENDPOINTS.BATCHES);
+    return serverFetch(API_ENDPOINTS.BATCHES());
   },
   
   getBatch: async (batchId: string) => {
@@ -52,11 +52,11 @@ export const serverBatchesService = {
 
 // Tasks service
 export const serverTasksService = {
-  getTask: async (messageId: string) => {
-    return serverFetch(API_ENDPOINTS.TASK(messageId));
+  getTask: async (taskId: string) => {
+    return serverFetch(API_ENDPOINTS.TASK(taskId));
   },
   
   getTaskStats: async () => {
-    return serverFetch(API_ENDPOINTS.TASK_STATS);
+    return serverFetch(API_ENDPOINTS.TASK_STATS());
   },
 }; 

@@ -67,7 +67,7 @@ export function useSWRFetch<T>(url: string, config?: SWRConfiguration) {
 
 // Health hooks
 export function useHealth(config?: SWRConfiguration) {
-  return useSWRFetch<HealthCheckResponse>(API_ENDPOINTS.HEALTH, config);
+  return useSWRFetch<HealthCheckResponse>(API_ENDPOINTS.HEALTH(), config);
 }
 
 // Batch hooks
@@ -80,7 +80,7 @@ export function useBatch(batchId: string, config?: SWRConfiguration) {
 
 export function useBatches(config?: SWRConfiguration) {
   return useSWRFetch<BatchListResponse>(
-    API_ENDPOINTS.BATCHES,
+    API_ENDPOINTS.BATCHES(),
     config
   );
 }
@@ -114,7 +114,7 @@ export function useTask(messageId: string, config?: SWRConfiguration) {
 
 export function useTaskStats(config?: SWRConfiguration) {
   return useSWRFetch<TaskStatsResponse>(
-    API_ENDPOINTS.TASK_STATS,
+    API_ENDPOINTS.TASK_STATS(),
     config
   );
 } 

@@ -9,11 +9,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { FaBrain } from "react-icons/fa";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { API_SECRET_KEY, getApiUrl } from "@/lib/config";
+import { testConnection } from "@/lib/api/services";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 export default function LoginPage() {
     const [apiKey, setApiKey] = useState("");
     const [apiUrl, setApiUrl] = useState(getApiUrl());
     const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [testResult, setTestResult] = useState<{success: boolean; message?: string} | null>(null);
     const { login, isAuthenticated } = useAuth();
     const router = useRouter();
 
@@ -33,29 +38,54 @@ export default function LoginPage() {
         }
     }, [isAuthenticated]);
 
+    // Clear test results when URL or key changes
+    useEffect(() => {
+        setTestResult(null);
+    }, [apiUrl, apiKey]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
+        setIsLoading(true);
+        setTestResult(null);
 
         if (!apiKey) {
             setError("API Key is required");
+            setIsLoading(false);
             return;
         }
 
         if (!apiUrl) {
             setError("API URL is required");
+            setIsLoading(false);
             return;
         }
 
         try {
-            // Process the login with both API key and URL
-            login(apiKey, apiUrl);
+            // Test the connection before proceeding
+            const result = await testConnection(apiUrl, apiKey);
+            setTestResult(result);
             
-            // Force a page reload to ensure config picks up the new API URL
-            window.location.href = "/dashboard";
+            if (!result.success) {
+                setIsLoading(false);
+                return;
+            }
+            
+            // If connection test passed, proceed with login
+            setTimeout(() => {
+                // Process the login with both API key and URL
+                login(apiKey, apiUrl);
+                
+                // Force a page reload to ensure config picks up the new API URL
+                window.location.href = "/dashboard";
+            }, 500); // Small delay to show the success message
         } catch (err) {
             console.error("Login error:", err);
-            setError("Authentication failed. Please check your API key and URL.");
+            setTestResult({
+                success: false,
+                message: "Authentication failed. Please check your API key and URL."
+            });
+            setIsLoading(false);
         }
     };
 
@@ -83,10 +113,11 @@ export default function LoginPage() {
                             </label>
                             <Input
                                 id="apiUrl"
-                                placeholder="http://localhost"
+                                placeholder="http://localhost:8000"
                                 value={apiUrl}
                                 onChange={(e) => setApiUrl(e.target.value)}
                                 className="w-full"
+                                disabled={isLoading}
                             />
                         </div>
                         <div className="space-y-2">
@@ -99,10 +130,35 @@ export default function LoginPage() {
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
                                 className="w-full"
+                                disabled={isLoading}
                             />
                         </div>
+                        
+                        {testResult && (
+                            <div className={`p-4 rounded-lg border text-sm flex items-start gap-3 ${
+                                testResult.success ? 'bg-background border-border' : 'bg-destructive/10 border-destructive/20 text-destructive'
+                            }`}>
+                                {testResult.success ? 
+                                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" /> : 
+                                    <XCircle className="h-5 w-5 flex-shrink-0" />
+                                }
+                                <p className="leading-5">
+                                    {testResult.success 
+                                        ? "Connection successful! Logging in..." 
+                                        : testResult.message || "Connection failed"}
+                                </p>
+                            </div>
+                        )}
+                        
                         {error && <p className="text-sm text-destructive">{error}</p>}
-                        <Button type="submit" className="w-full">Login</Button>
+                        
+                        <Button 
+                            type="submit" 
+                            className="w-full" 
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (testResult?.success ? "Logging in..." : "Testing connection...") : "Login"}
+                        </Button>
                     </form>
                 </CardContent>
                 <CardFooter className="flex justify-center">

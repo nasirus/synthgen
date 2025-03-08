@@ -8,6 +8,76 @@ import type {
   TaskStatsResponse
 } from '@/lib/types';
 
+/**
+ * Test API connection with provided URL and key
+ * @param apiUrl The API URL to test
+ * @param apiKey The API key to authenticate with
+ * @returns Promise resolving to an object with success status and error message if any
+ */
+export async function testConnection(apiUrl: string, apiKey: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    // Format the API URL properly
+    let formattedUrl = apiUrl.trim();
+    
+    // Make sure URL has a protocol
+    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+      formattedUrl = `http://${formattedUrl}`;
+    }
+    
+    // Ensure no trailing slash before adding /health
+    formattedUrl = formattedUrl.endsWith('/') 
+      ? formattedUrl.slice(0, -1) 
+      : formattedUrl;
+    
+    // Create a health endpoint URL using the provided API URL
+    const healthEndpoint = `${formattedUrl}/health`;
+    
+    // Set a timeout to prevent long waits on unreachable servers
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    try {
+      // Make a fetch request with the provided credentials
+      const response = await fetch(healthEndpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        // Ensure we don't cache this request
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // If we get a successful response, the connection is valid
+      if (response.ok) {
+        return { success: true };
+      } else {
+        return { 
+          success: false, 
+          message: `Server error: ${response.status} ${response.statusText}` 
+        };
+      }
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      
+      // Check if the error was due to timeout
+      if (fetchError.name === 'AbortError') {
+        return { success: false, message: 'Connection timed out. Server unreachable.' };
+      }
+      
+      // Handle specific fetch errors
+      console.error('Fetch error:', fetchError);
+      return { success: false, message: 'Connection failed. Check URL and network.' };
+    }
+  } catch (error) {
+    console.error('Connection test failed:', error);
+    return { success: false, message: 'Invalid API URL format.' };
+  }
+}
+
 // Health service
 export const healthService = {
   getHealthCheck: async () => {

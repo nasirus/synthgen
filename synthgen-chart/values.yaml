@@ -29,8 +29,8 @@ rabbitmq:
 ui:
   image:
     repository: nasirus/synthgen-ui
-    tag: latest
-    pullPolicy: IfNotPresent
+    tag: 0.0.8
+    pullPolicy: Always
   resources:
     limits:
       cpu: "1"
@@ -40,15 +40,17 @@ ui:
     port: 3000
     nodePort: 30080
   env:
-    NEXT_PUBLIC_API_URL: http://synthgen-api:8000
+    API_URL: http://synthgen-api
+    API_PORT: 8000
+    API_SECRET_KEY: sk1-1564813548
 
 # API configuration
 api:
   replicas: 1
   image:
     repository: nasirus/synthgen-api
-    tag: latest
-    pullPolicy: IfNotPresent
+    tag: 0.0.8
+    pullPolicy: Always
   resources:
     limits:
       cpu: "1"
@@ -58,7 +60,7 @@ api:
     port: 8000
     nodePort: 30081
   env:
-    API_PORT: 8002
+    API_PORT: 8000
     API_SECRET_KEY: sk1-1564813548
 
 # Consumer configuration
@@ -66,8 +68,8 @@ consumer:
   replicas: 1
   image:
     repository: nasirus/synthgen-consumer
-    tag: latest
-    pullPolicy: IfNotPresent
+    tag: 0.0.8
+    pullPolicy: Always
   resources:
     limits:
       cpu: "1"
@@ -105,8 +107,8 @@ worker:
   replicas: 1
   image:
     repository: nasirus/synthgen-worker
-    tag: latest
-    pullPolicy: IfNotPresent
+    tag: 0.0.8
+    pullPolicy: Always
   resources:
     limits:
       cpu: "1"

@@ -1,6 +1,6 @@
 export const API_URL = process.env.API_URL || 'http://localhost';
 export const API_PORT = process.env.API_PORT || '8002';
-export const API_KEY = process.env.API_KEY;
+export const API_SECRET_KEY = process.env.API_SECRET_KEY;
 
 // Calculate the base URL with proper port handling
 export const getBaseUrl = (): string => {

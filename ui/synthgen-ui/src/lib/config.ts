@@ -15,5 +15,5 @@ export const getBaseUrl = (): string => {
 export const API_BASE_URL = `${getBaseUrl()}`;
 
 // Application settings
-export const APP_TITLE = 'SynthGen';
-export const DEFAULT_THEME = 'dark'; 
+export const APP_TITLE = 'SynthGen Monitoring';
+export const DEFAULT_THEME = 'system';

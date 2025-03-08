@@ -27,7 +27,7 @@ services:
       - RABBITMQ_LOAD_DEFINITIONS=/etc/rabbitmq/definitions.json
 
   ui:
-    image: nasirus/synthgen-ui:0.0.8
+    image: nasirus/synthgen-ui:0.0.9
     deploy:
       resources:
         limits:
@@ -45,7 +45,7 @@ services:
       - synthetic-data-network
 
   api:
-    image: nasirus/synthgen-api:0.0.8
+    image: nasirus/synthgen-api:0.0.9
     deploy:
       resources:
         limits:
@@ -75,7 +75,7 @@ services:
       - synthetic-data-network
 
   consumer:
-    image: nasirus/synthgen-consumer:0.0.8
+    image: nasirus/synthgen-consumer:0.0.9
     deploy:
       mode: replicated
       replicas: ${NUM_CONSUMERS:-1}
@@ -123,7 +123,7 @@ services:
       - synthetic-data-network
 
   worker:
-    image: nasirus/synthgen-worker:0.0.8
+    image: nasirus/synthgen-worker:0.0.9
     deploy:
       mode: replicated
       replicas: ${NUM_WORKERS:-1}

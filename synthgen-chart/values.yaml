@@ -29,8 +29,8 @@ rabbitmq:
 ui:
   image:
     repository: nasirus/synthgen-ui
-    tag: 0.0.10
-    pullPolicy: Never
+    tag: 0.0.11
+    pullPolicy: Always
   resources:
     limits:
       cpu: "1"
@@ -49,7 +49,7 @@ api:
   replicas: 1
   image:
     repository: nasirus/synthgen-api
-    tag: 0.0.10
+    tag: 0.0.11
     pullPolicy: Always
   resources:
     limits:
@@ -68,7 +68,7 @@ consumer:
   replicas: 1
   image:
     repository: nasirus/synthgen-consumer
-    tag: 0.0.10
+    tag: 0.0.11
     pullPolicy: Always
   resources:
     limits:
@@ -107,7 +107,7 @@ worker:
   replicas: 1
   image:
     repository: nasirus/synthgen-worker
-    tag: 0.0.10
+    tag: 0.0.11
     pullPolicy: Always
   resources:
     limits:

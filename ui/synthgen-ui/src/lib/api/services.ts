@@ -5,76 +5,60 @@ import type {
   BatchListResponse,
   BatchTasksResponse,
   Task,
-  TaskStatsResponse
+  TaskStatsResponse,
+  TokenResponse
 } from '@/lib/types';
+import axios, { AxiosError } from 'axios';
 
 /**
  * Test API connection with provided URL and key
- * @param apiUrl The API URL to test
- * @param apiKey The API key to authenticate with
- * @returns Promise resolving to an object with success status and error message if any
  */
-export async function testConnection(apiUrl: string, apiKey: string): Promise<{ success: boolean; message?: string }> {
+export async function testConnection(apiKey: string, apiUrl: string): Promise<{ token: TokenResponse | null; message?: string }> {
   try {
-    // Format the API URL properly
-    let formattedUrl = apiUrl.trim();
+    const response = await axios.get(`${apiUrl}/token`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      },
+      timeout: 5000 // 5 second timeout
+    });
     
-    // Make sure URL has a protocol
-    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
-      formattedUrl = `http://${formattedUrl}`;
+    // Validate the response data has the expected shape
+    if (!response.data || typeof response.data.isValid !== 'boolean') {
+      return {
+        token: null,
+        message: 'Invalid response from server'
+      };
     }
     
-    // Ensure no trailing slash before adding /health
-    formattedUrl = formattedUrl.endsWith('/') 
-      ? formattedUrl.slice(0, -1) 
-      : formattedUrl;
-    
-    // Create a health endpoint URL using the provided API URL
-    const healthEndpoint = `${formattedUrl}/health`;
-    
-    // Set a timeout to prevent long waits on unreachable servers
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
-    try {
-      // Make a fetch request with the provided credentials
-      const response = await fetch(healthEndpoint, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        // Ensure we don't cache this request
-        cache: 'no-store',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      // If we get a successful response, the connection is valid
-      if (response.ok) {
-        return { success: true };
-      } else {
-        return { 
-          success: false, 
-          message: `Server error: ${response.status} ${response.statusText}` 
-        };
-      }
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      
-      // Check if the error was due to timeout
-      if (fetchError.name === 'AbortError') {
-        return { success: false, message: 'Connection timed out. Server unreachable.' };
-      }
-      
-      // Handle specific fetch errors
-      console.error('Fetch error:', fetchError);
-      return { success: false, message: 'Connection failed. Check URL and network.' };
-    }
+    return { token: response.data };
   } catch (error) {
     console.error('Connection test failed:', error);
-    return { success: false, message: 'Invalid API URL format.' };
+    
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      if (axiosError.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        return {
+          token: null,
+          message: axiosError.response.status === 401 
+            ? 'Invalid API key'
+            : `Server error: ${axiosError.response.status}`
+        };
+      } else if (axiosError.request) {
+        // The request was made but no response was received
+        return {
+          token: null,
+          message: 'No response from server. Please check the URL and try again.'
+        };
+      }
+    }
+    
+    // Something happened in setting up the request that triggered an Error
+    return {
+      token: null,
+      message: 'Failed to connect. Please check your network connection.'
+    };
   }
 }
 

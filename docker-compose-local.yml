@@ -55,7 +55,7 @@ services:
           memory: 1024M
     container_name: api
     ports:
-      - "${API_PORT:-8002}:8000"
+      - "8000:8000"
     depends_on:
       rabbitmq:
         condition: service_healthy

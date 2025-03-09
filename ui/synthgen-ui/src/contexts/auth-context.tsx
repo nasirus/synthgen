@@ -16,18 +16,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [apiKey, setApiKey] = useState<string>("");
     const [apiUrl, setApiUrl] = useState<string>("");
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
     useEffect(() => {
         // Check if there's a stored API key in localStorage
         const storedApiKey = localStorage.getItem('api_key');
         const storedApiUrl = localStorage.getItem('api_url');
-        if (storedApiKey) {
+        
+        if (storedApiKey && storedApiUrl) {
             setApiKey(storedApiKey);
+            setApiUrl(storedApiUrl);
             setIsAuthenticated(true);
         }
-        if (storedApiUrl) {
-            setApiUrl(storedApiUrl);
-        }
+        
+        setIsInitialized(true);
     }, []);
 
     const login = (key: string, url: string) => {
@@ -45,6 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('api_key');
         localStorage.removeItem('api_url');
     };
+
+    if (!isInitialized) {
+        return null;
+    }
 
     return (
         <AuthContext.Provider value={{ apiKey, apiUrl, isAuthenticated, login, logout }}>

@@ -122,3 +122,8 @@ export interface TaskStatsResponse {
 }
 
 
+// Token Types
+export interface TokenResponse {
+  isValid: boolean;
+}
+

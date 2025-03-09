@@ -10,41 +10,42 @@ import { FaBrain } from "react-icons/fa";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { API_SECRET_KEY, getApiUrl } from "@/lib/config";
 import { testConnection } from "@/lib/api/services";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { TokenResponse } from "@/lib/types";
 
 export default function LoginPage() {
     const [apiKey, setApiKey] = useState("");
     const [apiUrl, setApiUrl] = useState(getApiUrl());
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [testResult, setTestResult] = useState<{success: boolean; message?: string} | null>(null);
+    const [testResult, setTestResult] = useState<{token: TokenResponse | null; message?: string} | null>(null);
     const { login, isAuthenticated } = useAuth();
     const router = useRouter();
 
     // Redirect to dashboard if already authenticated
     useEffect(() => {
         if (isAuthenticated) {
-            router.push("/dashboard");
+            router.replace("/dashboard");
+            return;
         }
     }, [isAuthenticated, router]);
 
-    // Auto-login with API_SECRET_KEY from env if available
+    // Auto-fill API key from env if available
     useEffect(() => {
-        if (API_SECRET_KEY && !isAuthenticated) {
-            // Don't auto-login anymore, we need the API URL from the user
-            // Instead, just pre-fill the API key field
+        if (API_SECRET_KEY) {
             setApiKey(API_SECRET_KEY);
         }
-    }, [isAuthenticated]);
+    }, []);
 
     // Clear test results when URL or key changes
     useEffect(() => {
         setTestResult(null);
+        setError("");
     }, [apiUrl, apiKey]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        e.stopPropagation();
         setError("");
         setIsLoading(true);
         setTestResult(null);
@@ -52,41 +53,60 @@ export default function LoginPage() {
         if (!apiKey) {
             setError("API Key is required");
             setIsLoading(false);
-            return;
+            return false;
         }
 
         if (!apiUrl) {
             setError("API URL is required");
             setIsLoading(false);
-            return;
+            return false;
+        }
+
+        // Validate URL format
+        try {
+            new URL(apiUrl);
+        } catch {
+            setError("Please enter a valid URL");
+            setIsLoading(false);
+            return false;
         }
 
         try {
-            // Test the connection before proceeding
-            const result = await testConnection(apiUrl, apiKey);
-            setTestResult(result);
+            // Test the connection with provided credentials
+            const result = await testConnection(apiKey, apiUrl);
             
-            if (!result.success) {
+            if (!result?.token?.isValid) {
+                setTestResult({
+                    token: { isValid: false },
+                    message: result.message || "Invalid credentials. Please check your API key and URL."
+                });
                 setIsLoading(false);
-                return;
+                return false;
             }
             
+            setTestResult({
+                token: { isValid: true },
+                message: "Connection successful! Logging in..."
+            });
+
             // If connection test passed, proceed with login
+            login(apiKey, apiUrl);
+            
+            // Only redirect after successful login
             setTimeout(() => {
-                // Process the login with both API key and URL
-                login(apiKey, apiUrl);
-                
-                // Force a page reload to ensure config picks up the new API URL
-                window.location.href = "/dashboard";
-            }, 500); // Small delay to show the success message
+                router.replace("/dashboard");
+            }, 500);
+
         } catch (err) {
             console.error("Login error:", err);
             setTestResult({
-                success: false,
-                message: "Authentication failed. Please check your API key and URL."
+                token: { isValid: false },
+                message: "Connection failed. Please check your API URL and try again."
             });
             setIsLoading(false);
         }
+        
+        return false;
     };
 
     return (
@@ -136,14 +156,14 @@ export default function LoginPage() {
                         
                         {testResult && (
                             <div className={`p-4 rounded-lg border text-sm flex items-start gap-3 ${
-                                testResult.success ? 'bg-background border-border' : 'bg-destructive/10 border-destructive/20 text-destructive'
+                                testResult.token?.isValid ? 'bg-background border-border' : 'bg-destructive/10 border-destructive/20 text-destructive'
                             }`}>
-                                {testResult.success ? 
+                                {testResult.token?.isValid ? 
                                     <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" /> : 
                                     <XCircle className="h-5 w-5 flex-shrink-0" />
                                 }
                                 <p className="leading-5">
-                                    {testResult.success 
+                                    {testResult.token?.isValid 
                                         ? "Connection successful! Logging in..." 
                                         : testResult.message || "Connection failed"}
                                 </p>
@@ -157,7 +177,7 @@ export default function LoginPage() {
                             className="w-full" 
                             disabled={isLoading}
                         >
-                            {isLoading ? (testResult?.success ? "Logging in..." : "Testing connection...") : "Login"}
+                            {isLoading ? (testResult?.token ? "Logging in..." : "Testing connection...") : "Login"}
                         </Button>
                     </form>
                 </CardContent>

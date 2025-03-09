@@ -30,6 +30,9 @@ export async function testConnection(apiKey: string, apiUrl: string): Promise<{ 
       };
     }
     
+    localStorage.setItem('api_key', apiKey);
+    localStorage.setItem('api_url', apiUrl);
+    
     return { token: response.data };
   } catch (error) {
     console.error('Connection test failed:', error);

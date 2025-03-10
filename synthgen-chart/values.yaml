@@ -118,7 +118,7 @@ worker:
 elasticsearch:
   image:
     repository: docker.elastic.co/elasticsearch/elasticsearch
-    tag: 8.17.1
+    tag: 8.17.3
     pullPolicy: IfNotPresent
   resources:
     limits:

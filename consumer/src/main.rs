@@ -350,7 +350,7 @@ async fn process_message(
                     message_id.to_string(),
                     schemas::task_status::TaskStatus::Failed,
                     &schemas::llm_response::LLMResponse {
-                        completions: serde_json::Value::Null,
+                        completions: serde_json::json!({ "error": e.to_string() }),
                         cached: false,
                         attempt: 0,
                         started_at: processing_started_at,

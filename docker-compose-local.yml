@@ -152,7 +152,7 @@ services:
       - synthetic-data-network
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.3
     container_name: es01
     deploy:
       resources:

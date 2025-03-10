@@ -8,5 +8,5 @@ tenacity==9.0.0
 pytz==2024.2
 aio_pika==9.5.4
 boto3==1.36.13
-elasticsearch==8.17.1
+elasticsearch==8.17.3
 aiohttp==3.11.12

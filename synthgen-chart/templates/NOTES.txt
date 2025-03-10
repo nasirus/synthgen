@@ -2,6 +2,9 @@ Thank you for installing {{ .Chart.Name }}.
 
 Your release is named {{ .Release.Name }}.
 
+IMPORTANT: This chart uses Elastic Cloud on Kubernetes (ECK) for Elasticsearch.
+Ensure that the ECK operator was installed before deploying this chart.
+
 To get the application URL, run these commands:
 {{- if .Values.ingress.enabled }}
 {{- range $host := .Values.ingress.hosts }}
@@ -26,4 +29,19 @@ For the RabbitMQ management console:
 
 For the Minio console:
   kubectl port-forward svc/{{ .Release.Name }}-minio {{ .Values.minio.service.consolePort }}:{{ .Values.minio.service.consolePort }}
-  echo "Visit http://localhost:{{ .Values.minio.service.consolePort }} to access Minio console" 
+  echo "Visit http://localhost:{{ .Values.minio.service.consolePort }} to access Minio console"
+
+For Elasticsearch (managed by ECK):
+  # Get the auto-generated password for the 'elastic' user
+  PASSWORD=$(kubectl get secret {{ .Release.Name }}-elasticsearch-es-elastic-user -o go-template='{{.data.elastic | base64decode}}')
+  echo "Elasticsearch password: $PASSWORD"
+  
+  # Forward the Elasticsearch service port
+  kubectl port-forward svc/{{ .Release.Name }}-elasticsearch-http {{ .Values.elasticsearch.service.port }}:{{ .Values.elasticsearch.service.port }}
+  
+  # Access Elasticsearch (in another terminal)
+  # Note: The -k flag is used to skip certificate verification in development environments
+  curl -u "elastic:$PASSWORD" -k "https://localhost:{{ .Values.elasticsearch.service.port }}"
+
+To monitor the ECK operator's logs:
+  kubectl -n elastic-system logs -f statefulset.apps/elastic-operator 

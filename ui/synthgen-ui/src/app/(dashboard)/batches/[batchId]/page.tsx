@@ -105,8 +105,8 @@ export default function BatchDetailPage({ params }: { params: Promise<{ batchId:
     if (!batch || !batch.total_tokens) return [];
 
     return [
-      { type: "prompt", count: batch.prompt_tokens || 0, fill: "hsl(var(--chart-1))" },
-      { type: "completion", count: batch.completion_tokens || 0, fill: "hsl(var(--chart-2))" },
+      { type: "prompt", count: batch.prompt_tokens || 0, fill: "hsl(var(--chart-6))" },
+      { type: "completion", count: batch.completion_tokens || 0, fill: "hsl(var(--chart-7))" },
     ].filter(item => item.count > 0);
   };
 
@@ -117,11 +117,11 @@ export default function BatchDetailPage({ params }: { params: Promise<{ batchId:
     },
     prompt: {
       label: "Prompt",
-      color: "hsl(216, 100%, 50%)", // Blue
+      color: "hsl(var(--chart-6))", // Light green
     },
     completion: {
       label: "Completion",
-      color: "hsl(262, 100%, 50%)", // Indigo
+      color: "hsl(var(--chart-7))", // Gold/yellow
     },
   };
 

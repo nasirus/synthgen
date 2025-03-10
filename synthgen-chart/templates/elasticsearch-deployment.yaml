@@ -1,5 +1,5 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
 metadata:
   name: "{{ .Release.Name }}-elasticsearch"
   labels:
@@ -7,69 +7,50 @@ metadata:
     app.kubernetes.io/name: "{{ .Release.Name }}-elasticsearch"
     app.kubernetes.io/instance: "{{ .Release.Name }}"
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: "{{ .Release.Name }}-elasticsearch"
-  template:
-    metadata:
-      labels:
-        app: "{{ .Release.Name }}-elasticsearch"
-    spec:
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-      containers:
-      - name: elasticsearch
-        image: "{{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}"
-        imagePullPolicy: "{{ .Values.elasticsearch.image.pullPolicy }}"
-        securityContext:
-          runAsUser: 1000
-          runAsGroup: 1000
-        ports:
-        - name: http
-          containerPort: 9200
-        - name: transport
-          containerPort: 9300
+  version: "{{ .Values.elasticsearch.version }}"
+  nodeSets:
+  - name: default
+    count: {{ .Values.elasticsearch.replicas }}
+    config:
+      node.store.allow_mmap: false
+      node.roles: ["master", "data", "ingest"]
+      xpack.security.enabled: {{ .Values.elasticsearch.security.enabled }}
+    podTemplate:
+      spec:
+        containers:
+        - name: elasticsearch
+          resources:
+            limits:
+              cpu: "{{ .Values.elasticsearch.resources.limits.cpu }}"
+              memory: "{{ .Values.elasticsearch.resources.limits.memory }}"
+            {{- if .Values.elasticsearch.resources.requests }}
+            requests:
+              {{- if .Values.elasticsearch.resources.requests.cpu }}
+              cpu: "{{ .Values.elasticsearch.resources.requests.cpu }}"
+              {{- end }}
+              {{- if .Values.elasticsearch.resources.requests.memory }}
+              memory: "{{ .Values.elasticsearch.resources.requests.memory }}"
+              {{- end }}
+            {{- end }}
+          env:
+          - name: ES_JAVA_OPTS
+            value: "{{ .Values.elasticsearch.env.ES_JAVA_OPTS }}"
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        storageClassName: "{{ include "synthgen.storageClass" . }}"
         resources:
-          limits:
-            cpu: "{{ .Values.elasticsearch.resources.limits.cpu }}"
-            memory: "{{ .Values.elasticsearch.resources.limits.memory }}"
-        env:
-        - name: discovery.type
-          value: "single-node"
-        - name: xpack.security.enabled
-          value: "false"
-        - name: ES_JAVA_OPTS
-          value: "-Xms512m -Xmx512m"
-        livenessProbe:
-          tcpSocket:
-            port: http
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /
-            port: http
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        volumeMounts:
-        - name: elasticsearch-data
-          mountPath: /usr/share/elasticsearch/data
-      volumes:
-      - name: elasticsearch-data
-{{- if .Values.elasticsearch.persistence.enabled }}
-        persistentVolumeClaim:
-          claimName: "{{ .Release.Name }}-elasticsearch-pvc"
-{{- else }}
-        emptyDir: {}
-{{- end }}
+          requests:
+            storage: "{{ .Values.elasticsearch.persistence.size }}"
 ---
+# Service to expose Elasticsearch HTTP API
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ .Release.Name }}-elasticsearch"
+  name: "{{ .Release.Name }}-elasticsearch-http"
   labels:
     app: "{{ .Release.Name }}-elasticsearch"
     app.kubernetes.io/name: "{{ .Release.Name }}-elasticsearch"
@@ -78,26 +59,8 @@ spec:
   type: "{{ .Values.elasticsearch.service.type }}"
   ports:
   - port: {{ .Values.elasticsearch.service.port }}
-    targetPort: http
+    targetPort: 9200
     protocol: TCP
     name: http
   selector:
-    app: "{{ .Release.Name }}-elasticsearch"
-{{- if .Values.elasticsearch.persistence.enabled }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: "{{ .Release.Name }}-elasticsearch-pvc"
-  labels:
-    app: "{{ .Release.Name }}-elasticsearch"
-    app.kubernetes.io/name: "{{ .Release.Name }}-elasticsearch"
-    app.kubernetes.io/instance: "{{ .Release.Name }}"
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: "{{ include "synthgen.storageClass" . }}"
-  resources:
-    requests:
-      storage: "{{ .Values.elasticsearch.persistence.size }}"
-{{- end }} 
+    elasticsearch.k8s.elastic.co/cluster-name: "{{ .Release.Name }}-elasticsearch"

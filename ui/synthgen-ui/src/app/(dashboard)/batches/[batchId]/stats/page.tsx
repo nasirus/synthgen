@@ -483,13 +483,13 @@ export default function BatchStatsPage({ params }: { params: Promise<{ batchId: 
                     <Bar
                       dataKey="prompt_tokens"
                       stackId="a"
-                      fill="var(--color-prompt_tokens)"
+                      fill="hsl(var(--chart-6))"
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
                       dataKey="completion_tokens"
                       stackId="a"
-                      fill="var(--color-completion_tokens)"
+                      fill="hsl(var(--chart-7))"
                       radius={[0, 0, 4, 4]}
                     >
                       <LabelList

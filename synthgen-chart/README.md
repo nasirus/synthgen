@@ -1,121 +1,103 @@
 # Synthgen Helm Chart
 
-This Helm chart deploys the Synthetic Data Generation Framework on Kubernetes.
+This Helm chart deploys the Synthgen framework for processing LLM calls to generate synthetic data, with all its components:
 
-## Components
-
-The chart deploys the following components:
-
-- **RabbitMQ**: Message broker for communication between components
-- **API**: FastAPI web service that provides the API for the framework
-- **UI**: NextJS web application for monitoring the framework
-- **Consumer**: Rust-based consumer for processing messages
-- **Minio**: Object storage for storing generated data
-- **Worker**: Python-based worker for processing tasks
-- **Elasticsearch**: Database for storing metadata
-- **LiteLLM**: LLM service for generating synthetic data
+- RabbitMQ for message brokering
+- FastAPI web framework for the API
+- Elasticsearch (using ECK operator) for database
+- Rust-based consumer for messages
+- NextJS and shadcn UI for monitoring
 
 ## Prerequisites
 
-- Kubernetes 1.19+
-- Helm 3.2.0+
-- PV provisioner support in the underlying infrastructure (if persistence is enabled)
+- Kubernetes cluster
+- Helm v3
+- [Elastic Cloud on Kubernetes (ECK) operator](https://www.elastic.co/guide/en/cloud-on-k8s/current/k8s-overview.html)
 
-## Installation
+## Installing ECK Operator
+
+Before deploying this chart, you need to install the ECK operator:
 
 ```bash
-# Add the chart repository
-helm repo add synthgen https://synthgen.io/charts
-helm repo update
+# Install custom resource definitions
+kubectl create -f https://download.elastic.co/downloads/eck/2.16.1/crds.yaml
 
-# Install the chart
-helm install synthgen synthgen/synthgen
+# Install the operator with its RBAC rules
+kubectl apply -f https://download.elastic.co/downloads/eck/2.16.1/operator.yaml
+
+# Monitor the operator's setup (optional)
+kubectl -n elastic-system logs -f statefulset.apps/elastic-operator
 ```
 
-To install the chart with a custom release name and namespace:
+## Installing the Chart
 
 ```bash
-helm install my-release synthgen/synthgen -n my-namespace
+# Clone the repository (if you haven't already)
+git clone <repository-url>
+cd synthgen-chart
+
+# Install the chart with the release name "synthgen"
+helm install synthgen .
 ```
 
 ## Configuration
 
-See `values.yaml` for the full list of configurable parameters.
+See the [values.yaml](values.yaml) file for configuration options.
 
-### Required Values
+## Accessing Services
 
-At a minimum, you should configure:
+After the deployment is complete, you can access the services:
 
-- `global.storageClass`: The storage class to use for persistent volumes
-- `api.env.API_SECRET_KEY`: Secret key for API authentication
-
-### Optional Values
-
-You can customize the deployment by setting additional values:
-
-- `rabbitmq.service.type`: Service type for RabbitMQ (default: ClusterIP)
-- `rabbitmq.persistence.enabled`: Enable persistence for RabbitMQ (default: true)
-- `elasticsearch.persistence.enabled`: Enable persistence for Elasticsearch (default: true)
-- `minio.persistence.enabled`: Enable persistence for Minio (default: true)
-- `ingress.enabled`: Enable ingress for UI and API (default: true)
-
-### Scaling the Services
-
-To scale the services, you can set the number of replicas:
-
+### UI
 ```bash
-helm upgrade synthgen synthgen/synthgen --set worker.replicas=3 --set consumer.replicas=2
+# If using NodePort
+http://<node-ip>:30080
+
+# If using Ingress
+http://synthgen.local
 ```
 
-## Uninstallation
+### API
+```bash
+# If using NodePort
+http://<node-ip>:30081
 
-To uninstall the chart:
+# If using Ingress
+http://synthgen.local/api
+```
+
+### Elasticsearch
+```bash
+# Get Elasticsearch password
+PASSWORD=$(kubectl get secret synthgen-elasticsearch-es-elastic-user -o go-template='{{.data.elastic | base64decode}}')
+
+# Forward port
+kubectl port-forward svc/synthgen-elasticsearch-http 9200:9200
+
+# Access Elasticsearch
+curl -u "elastic:$PASSWORD" -k "https://localhost:9200"
+```
+
+### RabbitMQ Management Console
+```bash
+kubectl port-forward svc/synthgen-rabbitmq 15672:15672
+# Visit http://localhost:15672
+```
+
+### Minio Console
+```bash
+kubectl port-forward svc/synthgen-minio 9001:9001
+# Visit http://localhost:9001
+```
+
+## Uninstalling the Chart
 
 ```bash
 helm uninstall synthgen
 ```
 
-## Persistence
+## Notes
 
-The chart supports persistence for RabbitMQ, Elasticsearch, and Minio data. 
-To enable persistence, set the corresponding persistence.enabled value to true.
-
-## Accessing Services
-
-Once the chart is deployed, you can access the services using port-forwarding:
-
-```bash
-# Access the UI
-kubectl port-forward svc/synthgen-ui 3000:3000
-
-# Access the API
-kubectl port-forward svc/synthgen-api 8000:8000
-
-# Access RabbitMQ management console
-kubectl port-forward svc/synthgen-rabbitmq 15672:15672
-
-# Access Minio console
-kubectl port-forward svc/synthgen-minio 9001:9001
-```
-
-If ingress is enabled, you can access the UI and API through the configured host. 
-
-## Storage Class Handling
-
-This chart includes automatic storage class detection and fallback mechanisms to make it work across different Kubernetes environments:
-
-1. If a `standard` storage class exists, it will be used
-2. If no `standard` storage class exists but `hostpath` exists, the chart will create a `standard` storage class that uses the `hostpath` provisioner
-3. If neither exists, the chart creates a `standard` storage class with static PersistentVolumes for each component
-
-This makes the chart work out-of-the-box in most environments, including:
-- Docker Desktop Kubernetes
-- Minikube
-- Kind
-- Cloud providers (which typically have their own `standard` storage class)
-
-You can override this behavior by setting `global.storageClass` to specify a particular storage class:
-
-```bash
-helm install synthgen ./synthgen-chart --set global.storageClass=your-storage-class
-``` 
+- The ECK operator manages the Elasticsearch cluster
+- Default credentials for Elasticsearch are stored in a Kubernetes secret
+- For production use, adjust resource limits and enable persistence as needed 

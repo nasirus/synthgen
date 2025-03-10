@@ -8,7 +8,8 @@ param (
     [string]$f,
     [string]$values = "",
     [int]$timeout = 300,  # Default timeout in seconds for waiting for pods
-    [switch]$wait
+    [switch]$wait,
+    [switch]$skipEck # Add parameter to skip ECK installation if needed
 )
 
 # Function to log the current step with clear formatting
@@ -297,6 +298,7 @@ Write-Host "  Release: $release" -ForegroundColor Cyan
 if ($values) { Write-Host "  Values file: $values" -ForegroundColor Cyan }
 Write-Host "  Pod wait timeout: $timeout seconds" -ForegroundColor Cyan
 Write-Host "  Wait for Helm deployment: $wait" -ForegroundColor Cyan
+Write-Host "  Skip ECK installation: $skipEck" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # Set default values
@@ -383,8 +385,64 @@ if ($ValuesFile) {
     Write-Host "No values file specified, using default values" -ForegroundColor Cyan
 }
 
+# Install ECK operator
+Log-Step -StepNumber 6 -StepDescription "Installing Elastic Cloud on Kubernetes (ECK) operator"
+if (-not $skipEck) {
+    Write-Host "Installing ECK operator in namespace $Namespace..." -ForegroundColor Cyan
+    
+    Write-Host "Step 1: Installing ECK custom resource definitions..." -ForegroundColor Cyan
+    kubectl create -f https://download.elastic.co/downloads/eck/2.16.1/crds.yaml 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Note: CRDs might already exist, continuing..." -ForegroundColor Yellow
+    } else {
+        Write-Host "ECK CRDs installed successfully" -ForegroundColor Green
+    }
+    
+    Write-Host "Step 2: Installing ECK operator..." -ForegroundColor Cyan
+    kubectl apply -f https://download.elastic.co/downloads/eck/2.16.1/operator.yaml 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Warning: Error while installing ECK operator. The operator might already be installed." -ForegroundColor Yellow
+    } else {
+        Write-Host "ECK operator installed successfully" -ForegroundColor Green
+    }
+    
+    Write-Host "Step 3: Waiting for ECK operator to start..." -ForegroundColor Cyan
+    $operatorReadyAttempts = 0
+    $maxOperatorReadyAttempts = 20
+    $operatorReady = $false
+    
+    while ((-not $operatorReady) -and ($operatorReadyAttempts -lt $maxOperatorReadyAttempts)) {
+        $operatorReadyAttempts++
+        Write-Host "Checking operator status (attempt $operatorReadyAttempts/$maxOperatorReadyAttempts)..." -ForegroundColor Cyan
+        
+        $operatorStatus = kubectl get pods -n elastic-system -l "app.kubernetes.io/name=elastic-operator" -o json | ConvertFrom-Json
+        
+        if ($operatorStatus -and $operatorStatus.items -and $operatorStatus.items.Count -gt 0) {
+            $readyStatus = $operatorStatus.items[0].status.containerStatuses[0].ready
+            if ($readyStatus -eq $true) {
+                $operatorReady = $true
+                Write-Host "ECK operator is running and ready" -ForegroundColor Green
+            } else {
+                Write-Host "ECK operator is not ready yet, waiting..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 10
+            }
+        } else {
+            Write-Host "ECK operator pods not found yet, waiting..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 10
+        }
+    }
+    
+    if (-not $operatorReady) {
+        Write-Host "Warning: ECK operator might not be ready. Proceeding with installation anyway, but Elasticsearch might not deploy correctly." -ForegroundColor Yellow
+    } else {
+        Write-Host "ECK operator is properly installed and running" -ForegroundColor Green
+    }
+} else {
+    Write-Host "Skipping ECK operator installation as requested" -ForegroundColor Yellow
+}
+
 # Install the chart
-Log-Step -StepNumber 6 -StepDescription "Installing Helm chart"
+Log-Step -StepNumber 7 -StepDescription "Installing Helm chart"
 Write-Host "Installing $ReleaseName in namespace $Namespace..." -ForegroundColor Cyan
 $installCommand = "helm install $ReleaseName ./synthgen-chart $ValuesArg --namespace $Namespace"
 if ($wait) {
@@ -397,7 +455,7 @@ Test-CommandSuccess -ExitCode $LASTEXITCODE -ErrorMessage "Failed to install Hel
 Write-Host "Helm chart installation initiated successfully" -ForegroundColor Green
 
 # Check deployment status
-Log-Step -StepNumber 7 -StepDescription "Checking initial deployment status"
+Log-Step -StepNumber 8 -StepDescription "Checking initial deployment status"
 Write-Host "Checking deployment status..." -ForegroundColor Cyan
 kubectl get all -n $Namespace -l "app.kubernetes.io/instance=$ReleaseName"
 if ($LASTEXITCODE -ne 0) {
@@ -408,7 +466,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Wait for pods to be ready if --wait isn't used with helm
 if (-not $wait) {
-    Log-Step -StepNumber 8 -StepDescription "Monitoring resource and pod readiness"
+    Log-Step -StepNumber 9 -StepDescription "Monitoring resource and pod readiness"
     $resourcesReady = Wait-ForResourcesReady -Namespace $Namespace -ReleaseName $ReleaseName -Timeout $timeout
     if (-not $resourcesReady) {
         Write-Host "Deployment didn't complete successfully within the timeout period." -ForegroundColor Red
@@ -419,7 +477,7 @@ if (-not $wait) {
 }
 
 # Deployment summary
-Log-Step -StepNumber 9 -StepDescription "Deployment summary"
+Log-Step -StepNumber 10 -StepDescription "Deployment summary"
 Write-Host "Deployment Status:" -ForegroundColor Cyan
 kubectl get all -n $Namespace -l "app.kubernetes.io/instance=$ReleaseName"
 
@@ -427,4 +485,13 @@ Write-Host "`nInstallation complete!" -ForegroundColor Green
 Write-Host "To get the application URL and other information, run:" -ForegroundColor Yellow
 Write-Host "  helm status $ReleaseName -n $Namespace" -ForegroundColor Yellow 
 
-Log-Step -StepNumber 10 -StepDescription "Deployment completed successfully" 
+# Add information about Elasticsearch access
+Write-Host "`nElasticsearch access information:" -ForegroundColor Yellow
+Write-Host "To retrieve the Elasticsearch password:" -ForegroundColor Yellow
+Write-Host "  \$PASSWORD=kubectl get secret $ReleaseName-elasticsearch-es-elastic-user -o go-template='{{.data.elastic | base64decode}}' -n $Namespace" -ForegroundColor Yellow
+Write-Host "To access Elasticsearch API:" -ForegroundColor Yellow
+Write-Host "  kubectl port-forward -n $Namespace svc/$ReleaseName-elasticsearch-http 9200:9200" -ForegroundColor Yellow
+Write-Host "  # In another terminal:" -ForegroundColor Yellow
+Write-Host "  curl -u \"elastic:\$PASSWORD\" -k \"https://localhost:9200\"" -ForegroundColor Yellow
+
+Log-Step -StepNumber 11 -StepDescription "Deployment completed successfully" 

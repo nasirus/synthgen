@@ -177,44 +177,46 @@ export default function BatchStatsPage({ params }: { params: Promise<{ batchId: 
 
   return (
     <div className="container p-0 mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
+      <div className="flex justify-between items-start mb-6">
+        <div className="flex items-start gap-2">
           <Button variant="ghost" onClick={navigateBack} className="mr-2 p-2">
             <ArrowLeft className="h-4 w-4" />
             <span className="ml-1">Back</span>
           </Button>
-          <div className="hidden sm:flex items-center ml-4 space-x-4">
-            <div className="flex items-center">
-              <p className="text-sm font-medium mr-2">Range:</p>
-              <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger className="w-[135px] h-8">
-                  <SelectValue placeholder="Select time range" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeRangeOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="hidden sm:flex flex-col ml-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <p className="text-sm font-medium mr-2">Range:</p>
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                  <SelectTrigger className="w-[135px] h-8">
+                    <SelectValue placeholder="Select time range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeRangeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center">
+                <p className="text-sm font-medium mr-2">Interval:</p>
+                <Select value={interval} onValueChange={setInterval}>
+                  <SelectTrigger className="w-[105px] h-8">
+                    <SelectValue placeholder="Select interval" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {intervalOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex items-center">
-              <p className="text-sm font-medium mr-2">Interval:</p>
-              <Select value={interval} onValueChange={setInterval}>
-                <SelectTrigger className="w-[105px] h-8">
-                  <SelectValue placeholder="Select interval" />
-                </SelectTrigger>
-                <SelectContent>
-                  {intervalOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="text-[8px] text-muted-foreground">
+            <div className="text-[8px] text-muted-foreground mt-1">
               {formatTimeRange(timeRange)}
             </div>
           </div>
@@ -689,21 +691,21 @@ export default function BatchStatsPage({ params }: { params: Promise<{ batchId: 
                     {[...stats.time_series]
                       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
                       .map((point: TimeSeriesDataPoint, index: number) => (
-                      <tr key={index} className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-4">
-                          {new Date(point.timestamp).toLocaleString()}
-                        </td>
-                        <td className="text-right py-2 px-4">{point.total_tasks.toLocaleString()}</td>
-                        <td className="text-right py-2 px-4">{point.completed_tasks.toLocaleString()}</td>
-                        <td className="text-right py-2 px-4">{point.failed_tasks.toLocaleString()}</td>
-                        <td className="text-right py-2 px-4">{point.cached_tasks.toLocaleString()}</td>
-                        <td className="text-right py-2 px-4">{point.total_tokens.toLocaleString()}</td>
-                        <td className="text-right py-2 px-4">{point.prompt_tokens.toLocaleString()}</td>
-                        <td className="text-right py-2 px-4">{point.completion_tokens.toLocaleString()}</td>
-                        <td className="text-right py-2 px-4">{`${(point.avg_duration_ms / 1000).toFixed(2)}s`}</td>
-                        <td className="text-right py-2 px-4">{point.tokens_per_second.toFixed(2)}</td>
-                      </tr>
-                    ))}
+                        <tr key={index} className="border-b hover:bg-muted/50">
+                          <td className="py-2 px-4">
+                            {new Date(point.timestamp).toLocaleString()}
+                          </td>
+                          <td className="text-right py-2 px-4">{point.total_tasks.toLocaleString()}</td>
+                          <td className="text-right py-2 px-4">{point.completed_tasks.toLocaleString()}</td>
+                          <td className="text-right py-2 px-4">{point.failed_tasks.toLocaleString()}</td>
+                          <td className="text-right py-2 px-4">{point.cached_tasks.toLocaleString()}</td>
+                          <td className="text-right py-2 px-4">{point.total_tokens.toLocaleString()}</td>
+                          <td className="text-right py-2 px-4">{point.prompt_tokens.toLocaleString()}</td>
+                          <td className="text-right py-2 px-4">{point.completion_tokens.toLocaleString()}</td>
+                          <td className="text-right py-2 px-4">{`${(point.avg_duration_ms / 1000).toFixed(2)}s`}</td>
+                          <td className="text-right py-2 px-4">{point.tokens_per_second.toFixed(2)}</td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>

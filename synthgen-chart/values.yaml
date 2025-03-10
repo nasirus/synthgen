@@ -11,8 +11,8 @@ rabbitmq:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: "500m"
-      memory: "256Mi"
+      cpu: "1"
+      memory: "1Gi"
   service:
     type: ClusterIP
     port: 5672
@@ -33,8 +33,8 @@ ui:
     pullPolicy: Always
   resources:
     limits:
-      cpu: "500m"
-      memory: "256Mi"
+      cpu: "1"
+      memory: "512Mi"
   service:
     type: NodePort
     port: 3000
@@ -53,8 +53,8 @@ api:
     pullPolicy: Always
   resources:
     limits:
-      cpu: "500m"
-      memory: "256Mi"
+      cpu: "1"
+      memory: "1Gi"
   service:
     type: NodePort
     port: 8000
@@ -72,10 +72,10 @@ consumer:
     pullPolicy: Always
   resources:
     limits:
-      cpu: "500m"
-      memory: "256Mi"
+      cpu: "1"
+      memory: "1Gi"
   env:
-    MAX_PARALLEL_TASKS: 10
+    CONSUMER_ID: 1
 
 # Minio configuration
 minio:
@@ -111,20 +111,19 @@ worker:
     pullPolicy: Always
   resources:
     limits:
-      cpu: "500m"
-      memory: "256Mi"
+      cpu: "1"
+      memory: "1Gi"
 
 # Elasticsearch configuration
 elasticsearch:
-  version: 8.17.3
-  replicas: 1
+  image:
+    repository: docker.elastic.co/elasticsearch/elasticsearch
+    tag: 8.17.1
+    pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: "500m"
-      memory: "512Mi"
-    requests:
-      cpu: "100m"
-      memory: "256Mi"
+      cpu: "1"
+      memory: "1Gi"
   service:
     type: ClusterIP
     port: 9200
@@ -132,9 +131,9 @@ elasticsearch:
     enabled: true
     size: 10Gi
   env:
-    ES_JAVA_OPTS: -Xms256m -Xmx256m
-  security:
-    enabled: false
+    ES_JAVA_OPTS: -Xms512m -Xmx512m
+    discovery.type: single-node
+    xpack.security.enabled: false
 
 # LiteLLM configuration
 litellm:
@@ -144,8 +143,8 @@ litellm:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "1"
+      memory: "1Gi"
   service:
     type: ClusterIP
     port: 4000

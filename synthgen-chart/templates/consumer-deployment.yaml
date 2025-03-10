@@ -26,7 +26,11 @@ spec:
             memory: "{{ .Values.consumer.resources.limits.memory }}"
         env:
         - name: CONSUMER_ID
-          value: "{{ .Values.consumer.env.CONSUMER_ID }}"
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MAX_PARALLEL_TASKS
+          value: "{{ .Values.consumer.env.MAX_PARALLEL_TASKS }}"
         envFrom:
         - configMapRef:
             name: "{{ .Release.Name }}-configmap" 

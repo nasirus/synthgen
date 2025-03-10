@@ -128,7 +128,7 @@ export default function BatchDetailPage({ params }: { params: Promise<{ batchId:
   return (
     <div className="container mx-auto p-0 max-w-full">
       {/* Header with navigation */}
-      <div className="flex items-center justify-between border-b pb-2 mb-3">
+      <div className="flex items-center justify-between pb-2 mb-3">
         <div className="flex items-center">
           <Button variant="ghost" onClick={navigateBack} className="mr-2 p-2">
             <ArrowLeft className="h-4 w-4" />
@@ -136,13 +136,13 @@ export default function BatchDetailPage({ params }: { params: Promise<{ batchId:
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={navigateToOverview} size="sm" variant="default" className="h-8">
+          <Button onClick={navigateToOverview} size="sm" variant="default" className="h-8 flex items-center">
             <TrendingUp className="h-4 w-4 mr-1" /> Overview
           </Button>
-          <Button onClick={navigateToStats} size="sm" variant="outline" className="h-8">
+          <Button onClick={navigateToStats} size="sm" variant="outline" className="h-8 flex items-center">
             <BarChart className="h-4 w-4 mr-1" /> Statistics
           </Button>
-          <Button onClick={navigateToTasks} size="sm" variant="outline" className="h-8">
+          <Button onClick={navigateToTasks} size="sm" variant="outline" className="h-8 flex items-center">
             <ClipboardList className="h-4 w-4 mr-1" /> Tasks
           </Button>
           <RefreshControl />

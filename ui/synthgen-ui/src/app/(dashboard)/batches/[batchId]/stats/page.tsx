@@ -214,19 +214,19 @@ export default function BatchStatsPage({ params }: { params: Promise<{ batchId: 
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="text-[8px] text-muted-foreground">
               {formatTimeRange(timeRange)}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={navigateToOverview} size="sm" variant="outline" className="h-8">
+          <Button onClick={navigateToOverview} size="sm" variant="outline" className="h-8 flex items-center">
             <TrendingUp className="h-4 w-4 mr-1" /> Overview
           </Button>
-          <Button onClick={() => { }} size="sm" variant="default" className="h-8">
+          <Button onClick={() => { }} size="sm" variant="default" className="h-8 flex items-center">
             <BarChartIcon className="h-4 w-4 mr-1" /> Statistics
           </Button>
-          <Button onClick={navigateToTasks} size="sm" variant="outline" className="h-8">
+          <Button onClick={navigateToTasks} size="sm" variant="outline" className="h-8 flex items-center">
             <ClipboardList className="h-4 w-4 mr-1" /> Tasks
           </Button>
           <RefreshControl />

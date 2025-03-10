@@ -145,13 +145,13 @@ export default function BatchTasksPage({ params }: { params: Promise<{ batchId: 
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={navigateToOverview} size="sm" variant="outline" className="h-8">
+          <Button onClick={navigateToOverview} size="sm" variant="outline" className="h-8 flex items-center">
             <TrendingUp className="h-4 w-4 mr-1" /> Overview
           </Button>
-          <Button onClick={navigateToStats} size="sm" variant="outline" className="h-8">
+          <Button onClick={navigateToStats} size="sm" variant="outline" className="h-8 flex items-center">
             <BarChart className="h-4 w-4 mr-1" /> Statistics
           </Button>
-          <Button onClick={() => { }} size="sm" variant="default" className="h-8">
+          <Button onClick={() => { }} size="sm" variant="default" className="h-8 flex items-center">
             <ClipboardList className="h-4 w-4 mr-1" /> Tasks
           </Button>
           <RefreshControl />

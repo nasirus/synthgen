@@ -33,7 +33,7 @@ export function RefreshControl() {
 
     return (
         <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 border rounded-md p-1.5">
+            <div className="flex items-center gap-2 border rounded-md p-1.5 h-8">
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -59,7 +59,7 @@ export function RefreshControl() {
                             value={refreshInterval}
                             onValueChange={(value) => setRefreshInterval(value as RefreshIntervalKey)}
                         >
-                            <SelectTrigger className="h-8 w-[70px]">
+                            <SelectTrigger className="h-full w-[70px]">
                                 <SelectValue placeholder="Interval" />
                             </SelectTrigger>
                             <SelectContent>
@@ -72,7 +72,7 @@ export function RefreshControl() {
                         </Select>
 
                         {/* Status indicator for auto-refresh */}
-                        <div className="relative h-8 w-8 flex items-center justify-center">
+                        <div className="relative h-full w-8 flex items-center justify-center">
                             {isRefreshing ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                             ) : autoRefreshTriggered ? (
@@ -93,7 +93,7 @@ export function RefreshControl() {
                         size="icon"
                         onClick={refreshNow}
                         disabled={isRefreshing}
-                        className="h-8 w-8 relative"
+                        className="h-full w-8 relative p-0"
                     >
                         {isRefreshing ? (
                             <Loader2 className="h-4 w-4 animate-spin" />

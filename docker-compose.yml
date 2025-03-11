@@ -169,6 +169,29 @@ services:
     networks:
       - synthetic-data-network
 
+  llamacpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llamacpp
+    deploy:
+      resources:
+        limits:
+          memory: 4096M
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    runtime: nvidia
+    ports:
+      - "3100:3100"
+    command: -hf Qwen/Qwen2.5-0.5B-Instruct-GGUF:qwen2.5-0.5b-instruct-q4_0.gguf --host 0.0.0.0 -n 4096 --port 3100
+    volumes:
+      - llamacpp_models:/root/.cache/llama.cpp
+    networks:
+      - synthetic-data-network
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm
@@ -191,6 +214,7 @@ volumes:
   minio_data:
   elasticsearch_data:
   rabbitmq_data:
+  llamacpp_models:
 
 # Add networks configuration at the bottom of the file
 networks:

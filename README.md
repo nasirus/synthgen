@@ -1,8 +1,6 @@
 # SynthGen: High-Performance LLM Inference Framework
 
-SynthGen is a powerful framework designed for high-performance LLM inference and synthetic data generation through parallel processing. Built with a focus on speed, scalability, and observability, SynthGen provides enterprise-grade capabilities for handling large-scale LLM tasks.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+SynthGen is a framework designed for high-performance LLM inference through parallel processing. Built with a focus on speed, scalability, and observability, SynthGen provides enterprise-grade capabilities for handling large-scale LLM tasks.
 
 ## Key Features
 
@@ -11,9 +9,9 @@ SynthGen is a powerful framework designed for high-performance LLM inference and
 - **Distributed Architecture**: Process thousands of LLM inference tasks concurrently across multiple workers
 - **Rust-Powered Processing**: Core data processing agent implemented in Rust for maximum throughput and minimal latency
 - **Optimized Message Flow**: RabbitMQ-based message broker ensures efficient task distribution and load balancing
-- **Parallelism Control**: Configurable parameters for scaling workers based on available compute resources
+- **Parallelism Control**: Configurable parameters for scaling workers
 
-### 🚀 Advanced Caching System
+### 💾 Advanced Caching System
 
 - **Intelligent Response Caching**: Automatically cache and reuse responses for identical prompts to reduce API costs
 - **Distributed Cache**: Elasticsearch-backed caching system ensures cache consistency across all workers
@@ -129,7 +127,7 @@ flowchart TB
         consumer
     end
     
-    subgraph AILayer["AI Layer"]
+    subgraph AILayer["Inference Layer"]
         llm
     end
     
@@ -156,7 +154,7 @@ flowchart TB
 2. Set up environment variables:
    ```bash
    cp .env.example .env
-   # Edit .env with your configuration
+   # Edit .env with your configuration but default values should work out of the box
    ```
 
 3. Start the services:
@@ -166,15 +164,22 @@ flowchart TB
 
 4. Verify the installation:
    ```bash
-   curl http://localhost:8002/health
+   curl http://localhost:8000/health
    ```
 
 ## Using the Client Library
 
-SynthGen provides a powerful Python client library for easy integration. See [Synthetic Data Client](https://github.com/nasirus/synthgen-client) for detailed documentation.
+SynthGen provides a Python client library. See [Synthetic Data Client](https://github.com/nasirus/synthgen-client) for detailed documentation.
 
 ```bash
-pip install synthgen-client python-dotenv
+pip install uv
+```
+```bash
+uv venv --python 3.12.0
+```
+
+```bash
+uv pip install synthgen-client python-dotenv
 ```
 
 ```python

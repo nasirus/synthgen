@@ -332,7 +332,7 @@ async def list_batches(
 @router.get("/batches/{batch_id}/tasks/export")
 async def get_batch_tasks(
     batch_id: str,
-    task_status: TaskStatus = Query(TaskStatus.COMPLETED),
+    task_status: Optional[TaskStatus] = None,
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
     current_user: str = Depends(get_current_user),
 ):

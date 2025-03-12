@@ -50,7 +50,7 @@ flowchart TB
     classDef titleClass fill:none,stroke:none,color:#FFFFFF,font-size:20px,font-weight:bold
     title["Synthetic Data Generation Framework Architecture"]
     class title titleClass
-    
+
     %% Component definitions with detailed labels
     client([User/Client])
     api["FastAPI
@@ -66,7 +66,7 @@ flowchart TB
     Message Processor"]
     worker["Python Worker
     Data Processor"]
-    
+
     %% Connections with descriptive labels
     client -->|"HTTP Requests"| api
     api -->|"Query/Store Data"| elasticsearch
@@ -80,7 +80,7 @@ flowchart TB
     consumer -->|"Generate Synthetic Data Request"| llm
     llm -->|"Return Synthetic Data"| consumer
     consumer -->|"Store Results"| elasticsearch
-    
+
     %% Component styling with centered text
     classDef clientStyle fill:#333,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef apiStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px,text-align:center
@@ -90,10 +90,10 @@ flowchart TB
     classDef llmStyle fill:#9ACD32,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef workerStyle fill:#3776AB,stroke:#000,color:white,stroke-width:2px,text-align:center
     classDef consumerStyle fill:#DEA584,stroke:#000,color:white,stroke-width:2px,text-align:center
-    
+
     %% Subgraph styling for better visibility
     classDef subgraphStyle color:#FFFFFF,text-align:center,font-weight:bold
-    
+
     %% Apply styling
     class client clientStyle
     class api apiStyle
@@ -103,34 +103,34 @@ flowchart TB
     class llm llmStyle
     class worker workerStyle
     class consumer consumerStyle
-    
+
     %% Subgraphs for clearer organization with better visibility
     subgraph Frontend["Frontend"]
         client
     end
-    
+
     subgraph APILayer["API Layer"]
         api
     end
-    
+
     subgraph DataStorage["Data Storage"]
         elasticsearch
         minio
     end
-    
+
     subgraph MessageHandling["Message Handling"]
         rabbitmq
     end
-    
+
     subgraph ProcessingLayer["Processing Layer"]
         worker
         consumer
     end
-    
+
     subgraph AILayer["Inference Layer"]
         llm
     end
-    
+
     %% Apply subgraph styling
     class Frontend,APILayer,DataStorage,MessageHandling,ProcessingLayer,AILayer subgraphStyle
 ```
@@ -146,18 +146,21 @@ flowchart TB
 ### Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/nasirus/synthgen.git
    cd synthgen
    ```
 
 2. Set up environment variables:
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration but default values should work out of the box
    ```
 
 3. Start the services:
+
    ```bash
    docker-compose up -d
    ```
@@ -174,6 +177,7 @@ SynthGen provides a Python client library. See [Synthetic Data Client](https://g
 ```bash
 pip install uv
 ```
+
 ```bash
 uv venv
 ```
@@ -185,27 +189,44 @@ uv pip install synthgen-client
 ```python
 from synthgen import SynthgenClient
 from synthgen.models import Task
-from dotenv import load_dotenv
 
-load_dotenv()
-# Initialize the client
 client = SynthgenClient()
 
-# Create a task with caching enabled
+# Check the health of the server
+health = client.check_health()
+print(health.model_dump_json(indent=4))
+
+# Use local model deployed on local container with llama-cpp
+# default model is qwen2.5-0.5b-instruct, you can change the model in docker-compose.yml
+provider_url = "http://llamacpp:3100/v1/chat/completions"
+# The model are optional as llama-cpp will use the default model
+model = "qwen2.5-0.5b-instruct"
+
+# Create a task with the provider url and the model
 task = Task(
-    custom_id="example-task",
-    method="POST",
-    url="http://your-llm-provider",
-    api_key="your-api-key",
+    url=provider_url,
+    # The body is the request body for the provider as standard openai format
     body={
-        "model": "your-model",
-        "messages": [{"role": "user", "content": "Your prompt here"}],
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a math expert.",
+            },
+            {"role": "user", "content": "solve 2x + 3 = 7"},
+        ],
+        "max_tokens": 1000,
+        "temperature": 0,
+        "stream": False,
     },
-    use_cache=True  # Enable caching for this task
 )
 
-# Submit and monitor with detailed tracking
-results = client.monitor_batch(tasks=[task])
+# Load task to the server and start monitoring, the result is a list of tasks
+result = client.monitor_batch([task])
+
+# Print the result of the first task
+print(result[0].model_dump_json(indent=4))
+
 ```
 
 ## Caching System
@@ -244,13 +265,13 @@ services:
     # ...
     deploy:
       mode: replicated
-      replicas: ${NUM_CONSUMERS:-1}  # Set NUM_CONSUMERS env var
+      replicas: ${NUM_CONSUMERS:-1} # Set NUM_CONSUMERS env var
 
   worker:
     # ...
     deploy:
       mode: replicated
-      replicas: ${NUM_WORKERS:-1}  # Set NUM_WORKERS env var
+      replicas: ${NUM_WORKERS:-1} # Set NUM_WORKERS env var
 ```
 
 ### Memory and CPU Allocation
@@ -265,7 +286,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 1024M
 ```
 
@@ -289,20 +310,20 @@ When using the `monitor_batch()` function in the client library, a CLI-based das
 
 SynthGen offers extensive configuration options via environment variables, see .env.example file:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `API_SECRET_KEY` | API Secret for FastAPI service | `sk1-1564813548` |
-| `API_PORT` | Port for FastAPI service | `8000` |
-| `NUM_WORKERS` | Number of Python worker instances | `1` |
-| `NUM_CONSUMERS` | Number of Rust consumer instances | `1` |
-| `MAX_PARALLEL_TASKS` | Number of parallel tasks per consumer | `10` |
-
+| Variable             | Description                           | Default          |
+| -------------------- | ------------------------------------- | ---------------- |
+| `API_SECRET_KEY`     | API Secret for FastAPI service        | `sk1-1564813548` |
+| `API_PORT`           | Port for FastAPI service              | `8000`           |
+| `NUM_WORKERS`        | Number of Python worker instances     | `1`              |
+| `NUM_CONSUMERS`      | Number of Rust consumer instances     | `1`              |
+| `MAX_PARALLEL_TASKS` | Number of parallel tasks per consumer | `10`             |
 
 ## Deployment
 
 For deployments, we recommend:
 
 1. Using docker-compose file:
+
    ```bash
    docker-compose up -d
    ```
@@ -321,4 +342,4 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

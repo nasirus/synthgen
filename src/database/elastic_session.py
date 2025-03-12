@@ -187,27 +187,26 @@ class ElasticsearchClient:
             )
         return tasks
 
-    async def get_batch_tasks(self, batch_id: str, task_status: TaskStatus):
+    async def get_batch_tasks(self, batch_id: str, task_status: TaskStatus = None):
         """
         Stream tasks for a specific batch using the scroll API.
         Yields each chunk (a dict containing a list of tasks and total count) as soon as it is received.
         """
+        conditions = [{"term": {"batch_id": batch_id}}]
+        if task_status:
+            conditions.append({"term": {"status": task_status.value}})
+
         query = {
             "query": {
                 "bool": {
-                    "must": [
-                        {"term": {"batch_id": batch_id}},
-                        (
-                            {"term": {"status": task_status.value}}
-                            if task_status
-                            else None
-                        ),
-                    ]
+                    "must": conditions
                 }
             },
             "sort": [{"created_at": "desc"}],
             "size": 10000,  # Number of documents per scroll
         }
+        
+        print(query)
 
         # Initialize scroll
         result = await self.client.search(
@@ -465,7 +464,9 @@ class ElasticsearchClient:
         Returns the number of documents deleted.
         """
         query = {"query": {"term": {"message_id": message_id}}}
-        result = await self.client.delete_by_query(index="events", body=query, refresh=True)
+        result = await self.client.delete_by_query(
+            index="events", body=query, refresh=True
+        )
         return result.get("deleted", 0)
 
     async def delete_task_by_hash(self, hash: str) -> int:
@@ -474,7 +475,9 @@ class ElasticsearchClient:
         Returns the number of documents deleted.
         """
         query = {"query": {"term": {"body_hash": hash}}}
-        result = await self.client.delete_by_query(index="events", body=query, refresh=True)
+        result = await self.client.delete_by_query(
+            index="events", body=query, refresh=True
+        )
         return result.get("deleted", 0)
 
     async def get_batch_usage_stats(

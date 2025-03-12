@@ -8,8 +8,8 @@ services:
           memory: 1024M
     container_name: rabbitmq
     ports:
-      - "5672:5672" # RabbitMQ default port
-      - "15672:15672" # RabbitMQ management interface port
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./rabbitmq-definitions.json:/etc/rabbitmq/definitions.json
@@ -106,8 +106,8 @@ services:
           memory: 1024M
     container_name: minio
     ports:
-      - "9000:9000" # API port
-      - "9001:9001" # Console port
+      - "9000:9000"
+      - "9001:9001"
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
@@ -184,7 +184,9 @@ services:
     runtime: nvidia
     ports:
       - "3100:3100"
-    command: -hf Qwen/Qwen2.5-0.5B-Instruct-GGUF:qwen2.5-0.5b-instruct-q4_0.gguf --host 0.0.0.0 -n 4096 --port 3100
+    command: -hf ${LLAMA_CPP_MODEL} --host 0.0.0.0 -n 1024 --port 3100 -np 4
+    env_file:
+      - .env
     volumes:
       - llamacpp_models:/root/.cache/llama.cpp
     networks:
@@ -216,7 +218,6 @@ volumes:
   rabbitmq_data:
   llamacpp_models:
 
-# Add networks configuration at the bottom of the file
 networks:
   synthetic-data-network:
     driver: bridge

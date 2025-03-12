@@ -186,25 +186,65 @@ uv venv
 uv pip install synthgen-client
 ```
 
+### Single Task
+
 ```python
 from synthgen import SynthgenClient
 from synthgen.models import Task
+from dotenv import load_dotenv
+import os
 
 client = SynthgenClient()
+
+# Load environment variables
+load_dotenv()
 
 # Check the health of the server
 health = client.check_health()
 print(health.model_dump_json(indent=4))
 
-# Use local model deployed on local container with llama-cpp
-# default model is qwen2.5-0.5b-instruct, you can change the model in docker-compose.yml
+# Uncomment the provider url you want to use
+# OpenAI
+# provider_url = "https://api.openai.com/v1/chat/completions"
+# model = "gpt-4o-mini"
+# api_key = os.getenv('OPENAI_API_KEY')
+
+# OpenRouter
+# provider_url = "https://openrouter.ai/api/v1/chat/completions"
+# model = "deepseek/deepseek-r1:free"
+# api_key = os.getenv('OPENROUTER_API_KEY')
+
+# Nebius
+# provider_url = "https://api.studio.nebius.ai/v1/chat/completions"
+# model = "meta-llama/Llama-3.3-70B-Instruct"
+# api_key = os.getenv('NEBIUS_API_KEY')
+
+# Hyperbolic
+# provider_url = "https://api.hyperbolic.xyz/v1/chat/completions"
+# model = "meta-llama/Llama-3.2-3B-Instruct"
+# api_key = os.getenv('HYPERBOLIC_API_KEY')
+
+# DeepSeek
+# provider_url = "https://api.deepseek.com/chat/completions"
+# model = "deepseek-reasoner"
+# api_key = os.getenv('DEEPSEEK_API_KEY')
+
+# Local Ollama
+# provider_url = "http://host.docker.internal:11434/v1/chat/completions" # Local ollama on host
+# model = "llama3.2:3b"
+# api_key = "sk-123"
+
+# Local Llama-cpp
+# Use local model deployed on local container with llama-cpp (default model is qwen2.5-0.5b-instruct), you can change the model in docker-compose.yml
 provider_url = "http://llamacpp:3100/v1/chat/completions"
-# The model are optional as llama-cpp will use the default model
-model = "qwen2.5-0.5b-instruct"
+model = "qwen2.5-0.5b-instruct" # The model are optional as llama-cpp will use the default model
+api_key = "sk-123"
 
 # Create a task with the provider url and the model
 task = Task(
     url=provider_url,
+    model=model,
+    api_key=api_key,
     # The body is the request body for the provider as standard openai format
     body={
         "model": model,
@@ -213,7 +253,7 @@ task = Task(
                 "role": "system",
                 "content": "You are a math expert.",
             },
-            {"role": "user", "content": "solve 2x + 3 = 7"},
+            {"role": "user", "content": "solve 2x + 3 = 30"},
         ],
         "max_tokens": 1000,
         "temperature": 0,
@@ -226,7 +266,85 @@ result = client.monitor_batch([task])
 
 # Print the result of the first task
 print(result[0].model_dump_json(indent=4))
+```
+### Batch Task
 
+```bash
+uv pip install datasets
+```
+```python
+import json
+import os
+from datetime import datetime
+from dotenv import load_dotenv
+from datasets import load_dataset
+from synthgen.sync_client import SynthgenClient
+from synthgen.models import Task
+
+load_dotenv()
+
+client = SynthgenClient()
+
+
+dataset_name = "openai/gsm8k"
+dataset_config = "main"
+provider_url = "http://llamacpp:3100/v1/chat/completions"
+model = "qwen2.5-0.5b-instruct"
+api_key = "sk-123"
+
+# Load the dataset
+print("Loading dataset...")
+dataset = load_dataset(dataset_name, dataset_config)
+
+# Select 10 examples from the test set
+data = dataset["test"].select(range(10))
+
+tasks = [
+    Task(
+        custom_id=f"id-{idx}",
+        method="POST",
+        url=provider_url,
+        api_key=api_key,
+        body={
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a math expert. You are given a math problem and you need to solve it",
+                },
+                {"role": "user", "content": row["question"]},
+            ],
+            "max_tokens": 1000,
+            "temperature": 0,
+            "stream": False,
+        },
+        dataset=dataset_name,
+        source=row,
+        use_cache=True,
+        track_progress=True,
+    )
+    for idx, row in enumerate(data)
+]
+
+# Run inference
+print(f"Running inference on {len(tasks)} examples...")
+
+batch = client.monitor_batch(
+    tasks=tasks,
+    cost_by_1m_input_token=0.3,
+    cost_by_1m_output_token=0.6,
+)
+
+# Convert to JSON-serializable format
+batch_results = [json.loads(task.model_dump_json()) for task in batch]
+
+# Save raw results
+benchmark_name = "gsm8k"
+date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+raw_results_file = f"raw_results_{benchmark_name}_{date_str}.json"
+with open(raw_results_file, "w") as f:
+    json.dump(batch_results, f, indent=2)
+print(f"Raw results saved to {raw_results_file}")
 ```
 
 ## Caching System
@@ -250,44 +368,6 @@ task = Task(
     # ... task parameters
     use_cache=False
 )
-```
-
-## Performance Optimization
-
-### Parallel Processing Configuration
-
-Adjust the number of workers and consumers in your docker-compose file:
-
-```yaml
-# docker-compose-local.yml
-services:
-  consumer:
-    # ...
-    deploy:
-      mode: replicated
-      replicas: ${NUM_CONSUMERS:-1} # Set NUM_CONSUMERS env var
-
-  worker:
-    # ...
-    deploy:
-      mode: replicated
-      replicas: ${NUM_WORKERS:-1} # Set NUM_WORKERS env var
-```
-
-### Memory and CPU Allocation
-
-Each component can be fine-tuned for optimal resource usage:
-
-```yaml
-# docker-compose-local.yml
-services:
-  consumer:
-    # ...
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 1024M
 ```
 
 ## Observability
@@ -317,20 +397,6 @@ SynthGen offers extensive configuration options via environment variables, see .
 | `NUM_WORKERS`        | Number of Python worker instances     | `1`              |
 | `NUM_CONSUMERS`      | Number of Rust consumer instances     | `1`              |
 | `MAX_PARALLEL_TASKS` | Number of parallel tasks per consumer | `10`             |
-
-## Deployment
-
-For deployments, we recommend:
-
-1. Using docker-compose file:
-
-   ```bash
-   docker-compose up -d
-   ```
-
-2. Setting up proper authentication for all services
-3. Configuring higher replica counts for workers and consumers
-4. Using a managed Elasticsearch service for larger deployments
 
 ## Client Libraries
 

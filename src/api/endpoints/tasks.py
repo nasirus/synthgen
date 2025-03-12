@@ -6,7 +6,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
 from database.elastic_session import ElasticsearchClient, get_elasticsearch_client
 from core.auth import get_current_user
-from schemas.task_status import TaskStatus
 
 router = APIRouter()
 USE_API_PREFIX = True

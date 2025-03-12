@@ -7,6 +7,7 @@ from schemas.task_status import TaskStatus
 class Task(BaseModel):
     message_id: str
     batch_id: Optional[str]
+    custom_id: Optional[str]
     status: TaskStatus
     body: Optional[dict]
     completions: Optional[dict]

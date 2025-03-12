@@ -190,7 +190,7 @@ class TimeRange(BaseModel):
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
-@router.get("/batches/{batch_id}", response_model=Batch)
+@router.get("/batches/{batch_id}", response_model=Batch | None)
 async def get_batch(
     batch_id: str,
     es_client: ElasticsearchClient = Depends(get_elasticsearch_client),
@@ -200,10 +200,7 @@ async def get_batch(
     try:
         batch_stats = await es_client.get_batch_stats(batch_id)
         if not batch_stats:
-            logger.info(f"No tasks found for batch_id {batch_id}")
-            raise HTTPException(
-                status_code=404, detail=f"No tasks found for batch_id {batch_id}"
-            )
+            return None
 
         # Calculate batch status
         batch_status = (

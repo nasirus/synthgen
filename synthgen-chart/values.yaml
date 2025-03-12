@@ -42,7 +42,6 @@ ui:
   env:
     API_URL: http://synthgen-api
     API_PORT: 8000
-    API_SECRET_KEY: sk1-1564813548
 
 # API configuration
 api:
@@ -61,7 +60,6 @@ api:
     nodePort: 30081
   env:
     API_PORT: 8000
-    API_SECRET_KEY: sk1-1564813548
 
 # Consumer configuration
 consumer:

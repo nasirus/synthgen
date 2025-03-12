@@ -175,11 +175,11 @@ SynthGen provides a Python client library. See [Synthetic Data Client](https://g
 pip install uv
 ```
 ```bash
-uv venv --python 3.12.0
+uv venv
 ```
 
 ```bash
-uv pip install synthgen-client python-dotenv
+uv pip install synthgen-client
 ```
 
 ```python

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { FaBrain } from "react-icons/fa";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { API_SECRET_KEY, getApiUrl } from "@/lib/config";
+import { getApiUrl } from "@/lib/config";
 import { testConnection } from "@/lib/api/services";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { TokenResponse } from "@/lib/types";
@@ -29,13 +29,6 @@ export default function LoginPage() {
             return;
         }
     }, [isAuthenticated, router]);
-
-    // Auto-fill API key from env if available
-    useEffect(() => {
-        if (API_SECRET_KEY) {
-            setApiKey(API_SECRET_KEY);
-        }
-    }, []);
 
     // Clear test results when URL or key changes
     useEffect(() => {

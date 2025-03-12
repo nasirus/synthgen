@@ -17,10 +17,10 @@ from database.elastic_session import get_elasticsearch_client
 
 
 class TaskSubmission(BaseModel):
-    custom_id: str
+    custom_id: Optional[str] = None
     method: str
     url: str
-    api_key: str
+    api_key: Optional[str] = None
     body: dict
     dataset: Optional[str] = None
     source: Optional[Dict[str, Any]] = None

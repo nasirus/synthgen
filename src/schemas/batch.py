@@ -13,7 +13,7 @@ class Batch(BaseModel):
     pending_tasks: int
     processing_tasks: int
     cached_tasks: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     duration: Optional[int] = None

@@ -51,7 +51,7 @@ class Settings:
     ELASTICSEARCH_PASSWORD: str = os.getenv("ELASTICSEARCH_PASSWORD", "changeme")
 
     # API Secret Key
-    API_SECRET_KEY: str = os.getenv("API_SECRET_KEY", "your-secret-key")
+    API_SECRET_KEY: str = os.getenv("API_SECRET_KEY")
 
 
 settings = Settings()

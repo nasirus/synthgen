@@ -6,6 +6,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from core.config import settings
 from database.elastic_session import ElasticsearchClient, get_elasticsearch_client
 from core.auth import get_current_user
+from schemas.task_status import TaskStatus
 
 router = APIRouter()
 USE_API_PREFIX = True
@@ -46,7 +47,8 @@ async def get_task_stats(
         # Transform Elasticsearch aggregation results to match TaskStatsResponse format
         stats = {
             "total_tasks": stats_aggs["total_tasks"]["value"],
-            "completed_tasks": stats_aggs["completed_tasks"]["doc_count"] - stats_aggs["cached_tasks"]["doc_count"],
+            "completed_tasks": stats_aggs["completed_tasks"]["doc_count"]
+            - stats_aggs["cached_tasks"]["doc_count"],
             "failed_tasks": stats_aggs["failed_tasks"]["doc_count"],
             "cached_tasks": stats_aggs["cached_tasks"]["doc_count"],
             "processing_tasks": stats_aggs["processing_tasks"]["doc_count"],
@@ -70,7 +72,7 @@ async def get_task_stats(
     wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True,
 )
-@router.get("/tasks/{message_id}", response_model=Task)
+@router.get("/tasks/{message_id}", response_model=Task | None)
 async def get_task(
     message_id: str,
     current_user: str = Depends(get_current_user),
@@ -79,12 +81,12 @@ async def get_task(
     try:
         event = await es_client.get_task_by_message_id(message_id)
         if not event:
-            raise HTTPException(
-                status_code=404, detail=f"Task with message_id {message_id} not found"
-            )
+            return None
+
         return Task(
             message_id=event["message_id"],
             batch_id=event.get("batch_id"),
+            custom_id=event.get("custom_id"),
             status=event["status"],
             body=event.get("body"),
             completions=event.get("completions"),

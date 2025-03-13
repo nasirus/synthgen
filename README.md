@@ -2,6 +2,12 @@
 
 SynthGen is a framework designed for high-performance LLM inference through parallel processing. Built with a focus on speed, scalability, and observability, SynthGen provides enterprise-grade capabilities for handling large-scale LLM tasks.
 
+## Why SynthGen?
+
+- **Need to reduce costs and improve response times?** SynthGen's caching system automatically reuses responses for identical prompts, eliminating redundant API calls.
+- **Struggling with processing thousands of LLM requests efficiently?** Our parallel processing architecture distributes workloads across multiple workers for maximum throughput.
+- **Lacking visibility into your LLM operations?** Comprehensive observability features provide real-time metrics, detailed logging, and performance dashboards for complete system transparency.
+
 ## Key Features
 
 ### ⚡ High-Performance Parallel Processing
@@ -234,6 +240,12 @@ print(health.model_dump_json(indent=4))
 # model = "llama3.2:3b"
 # api_key = "sk-123"
 
+# Litellm
+# To convert the non OpenAI provider to OpenAI format, you can use the litellm library, check litell_config.yaml for the provider config
+# provider_url = "http://litellm:4000/v1/chat/completions"
+# model = "gemini-2.0-flash-001"
+# api_key = os.getenv('GEMINI_API_KEY')
+
 # Local Llama-cpp
 # Use local model deployed on local container with llama-cpp (default model is qwen2.5-0.5b-instruct), you can change the model in docker-compose.yml
 provider_url = "http://llamacpp:3100/v1/chat/completions"
@@ -346,6 +358,32 @@ with open(raw_results_file, "w") as f:
     json.dump(batch_results, f, indent=2)
 print(f"Raw results saved to {raw_results_file}")
 ```
+## CLI Dashboard
+
+![CLI Dashboard](./assets/cli-dashboard.png)
+
+## UI
+
+http://localhost:3000
+
+API URL: http://localhost:8000
+
+API Key: sk1-1564813548
+
+### Dashboard
+![UI Dashboard](./assets/ui-dashboard.png)
+
+### Batches list
+![UI Batches List](./assets/ui-batches-list.png)
+
+### Batches Overview
+![UI Batches Overview](./assets/ui-batches-overview.png)
+
+### Batches Stats
+![UI Batches Stats](./assets/ui-stats.png)
+
+### Batches Tasks
+![UI Batches Tasks](./assets/ui-batches-tasks.png)
 
 ## Caching System
 
@@ -400,7 +438,8 @@ SynthGen offers extensive configuration options via environment variables, see .
 
 ## Client Libraries
 
-- [Python Client](https://github.com/nasirus/synthgen-client) - Official Python client with async support
+- [Python Client](https://github.com/nasirus/synthgen-client) - Official Python client.
+
 
 ## Contributing
 
